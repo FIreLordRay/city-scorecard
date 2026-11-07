@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ClipboardList, Star, LayoutGrid, MapPin, Scale } from 'lucide-react'
 import { loadAll, DAYS } from './data.js'
 import { rateServices, scoreAreas, equity, title, fmt, pct } from './score.js'
 import HealthMap from './HealthMap.jsx'
 
 const TABS = ['Service tracker', 'Service ratings', 'Neighborhood scorecard', 'Health access map', 'Who waits longer']
 const SLUGS = TABS.map((t) => t.toLowerCase().replaceAll(' ', '-'))
+const ICONS = [ClipboardList, Star, LayoutGrid, MapPin, Scale]
 // The open view lives in the URL hash, so refresh and shared links (#who-waits-longer) land on it.
 const tabFromHash = () => Math.max(0, SLUGS.indexOf(location.hash.slice(1)))
 
@@ -33,24 +35,34 @@ export default function App() {
   const saved = data?.savedAt && new Date(data.savedAt).toLocaleDateString()
 
   return (
-    <div className="page">
-      <header>
-        <div>
-          <h1>Chicago City Scorecard</h1>
-          <p className="muted">How well is the city serving its residents? Last {DAYS} days of 311 data from the Chicago Data Portal.</p>
+    <div className="shell">
+      <aside className="sidebar">
+        <p className="brand">Chicago City Scorecard</p>
+        <nav aria-label="Views">
+          {TABS.map((t, i) => {
+            const Icon = ICONS[i]
+            return (
+              <a key={t} href={`#${SLUGS[i]}`} aria-current={tab === i ? 'page' : undefined}>
+                <Icon size={18} aria-hidden="true" />{t}
+              </a>
+            )
+          })}
+        </nav>
+        <p className="muted small">311 requests, census income and clinic data from the Chicago Data Portal and HRSA.</p>
+      </aside>
+      <div className="content">
+        <header className="topbar">
+          <div>
+            <h1>{TABS[tab]}</h1>
+            <p className="muted">How well is the city serving its residents? Last {DAYS} days of 311 data.</p>
+          </div>
           {data && (
             <p className={`status ${saved ? 'saved' : 'live'}`} role="status">
               {!saved ? 'Live data' : error ? `Saved data from ${saved} · live data unavailable` : `Saved data from ${saved} · checking for live data…`}
             </p>
           )}
-        </div>
-      </header>
-      <nav aria-label="Views">
-        {TABS.map((t, i) => (
-          <a key={t} href={`#${SLUGS[i]}`} aria-current={tab === i ? 'page' : undefined}>{t}</a>
-        ))}
-      </nav>
-      <main aria-busy={!data && !error}>
+        </header>
+        <main className="panel" aria-busy={!data && !error}>
         {error && !data && <p role="alert" className="error">Could not load city data: {error}</p>}
         {!data && !error && <p className="muted" role="status">Loading city data…</p>}
         {data && tab === 0 && <><Finding e={eq} /><Tracker types={data.types} /></>}
@@ -58,7 +70,8 @@ export default function App() {
         {data && tab === 2 && <Scorecard areas={areas} />}
         {data && tab === 3 && <HealthMap areas={areas} clinics={data.clinics} centers={centers} />}
         {data && tab === 4 && <Fairness data={data} areas={areas} e={eq} />}
-      </main>
+        </main>
+      </div>
     </div>
   )
 }
