@@ -9,9 +9,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "snapshot": "node scripts/snapshot.js"
+    "snapshot": "node scripts/snapshot.js && node scripts/healthCenters.js"
   },
   "dependencies": {
+    "@fontsource/atkinson-hyperlegible": "^5.3.0",
     "leaflet": "^1.9.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { loadAll, DAYS } from './data.js'
-import { rateServices, scoreAreas, equity, title } from './score.js'
+import { rateServices, scoreAreas, equity, title, fmt, pct } from './score.js'
 import HealthMap from './HealthMap.jsx'
 
 const TABS = ['Service tracker', 'Service ratings', 'Neighborhood scorecard', 'Health access map', 'Who waits longer']
 const SLUGS = TABS.map((t) => t.toLowerCase().replaceAll(' ', '-'))
 // The open view lives in the URL hash, so refresh and shared links (#who-waits-longer) land on it.
 const tabFromHash = () => Math.max(0, SLUGS.indexOf(location.hash.slice(1)))
-const fmt = (n, d = 0) => (n == null || !isFinite(n) ? '–' : n.toLocaleString(undefined, { maximumFractionDigits: d }))
-const pct = (x) => `${Math.round(x * 100)}%`
 
 export default function App() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [tab, setTab] = useState(tabFromHash)
+  const [centers, setCenters] = useState([])
 
   useEffect(() => {
     const onHash = () => setTab(tabFromHash())
@@ -26,20 +25,22 @@ export default function App() {
     let live = false
     fetch('./snapshot.json').then((r) => (r.ok ? r.json() : null)).then((s) => s && !live && setData(s), () => {})
     loadAll().then((d) => { live = true; setData(d) }, (e) => setError(e.message))
+    // Saved by `npm run snapshot` from HRSA; the map still works without it.
+    fetch('./health-centers.json').then((r) => (r.ok ? r.json() : null)).then((h) => h && setCenters(h.list), () => {})
   }, [])
   const areas = useMemo(() => data && scoreAreas(data), [data])
+  const eq = useMemo(() => data && equity(data.byAreaType, data.lowIncome), [data])
+  const saved = data?.savedAt && new Date(data.savedAt).toLocaleDateString()
 
   return (
     <div className="page">
       <header>
-        <img src="./favicon.svg" alt="" width="36" height="36" />
         <div>
           <h1>Chicago City Scorecard</h1>
           <p className="muted">How well is the city serving its residents? Last {DAYS} days of 311 data from the Chicago Data Portal.</p>
-          {data?.savedAt && (
-            <p className="muted" role="status">
-              Showing saved data from {new Date(data.savedAt).toLocaleDateString()}.{' '}
-              {error ? 'Live data could not be loaded.' : 'Checking for live data…'}
+          {data && (
+            <p className={`status ${saved ? 'saved' : 'live'}`} role="status">
+              {!saved ? 'Live data' : error ? `Saved data from ${saved} · live data unavailable` : `Saved data from ${saved} · checking for live data…`}
             </p>
           )}
         </div>
@@ -52,13 +53,26 @@ export default function App() {
       <main aria-busy={!data && !error}>
         {error && !data && <p role="alert" className="error">Could not load city data: {error}</p>}
         {!data && !error && <p className="muted" role="status">Loading city data…</p>}
-        {data && tab === 0 && <Tracker types={data.types} />}
+        {data && tab === 0 && <><Finding e={eq} /><Tracker types={data.types} /></>}
         {data && tab === 1 && <Ratings types={data.types} />}
         {data && tab === 2 && <Scorecard areas={areas} />}
-        {data && tab === 3 && <HealthMap areas={areas} clinics={data.clinics} />}
-        {data && tab === 4 && <Fairness data={data} areas={areas} />}
+        {data && tab === 3 && <HealthMap areas={areas} clinics={data.clinics} centers={centers} />}
+        {data && tab === 4 && <Fairness data={data} areas={areas} e={eq} />}
       </main>
     </div>
+  )
+}
+
+// The app's headline result, shown on the landing view so visitors see it without digging.
+function Finding({ e }) {
+  const gap = e.poor / e.rich - 1
+  if (gap <= 0.05) return null
+  return (
+    <a className="finding" href="#who-waits-longer">
+      <strong>{pct(gap)} longer</strong>
+      <span>The same 311 request takes {pct(gap)} longer to close in Chicago's poorest neighborhoods than in the richest.</span>
+      <span className="cta">See who waits longer →</span>
+    </a>
   )
 }
 
@@ -113,9 +127,18 @@ function Ratings({ types }) {
   )
 }
 
+const AREA_COLS = [['name', 'Neighborhood'], ['score', 'Grade'], ['openShare', 'Open'], ['days', 'Avg days'],
+  ['clinicKm', 'Nearest clinic'], ['perK', 'Requests / 1k residents']]
+
 function Scorecard({ areas }) {
   const [q, setQ] = useState('')
-  const shown = areas.filter((a) => a.name.includes(q.toUpperCase()))
+  const [sort, setSort] = useState({ key: 'score', dir: -1 })
+  const shown = areas.filter((a) => a.name.includes(q.trim().toUpperCase())).sort((a, b) => {
+    const [x, y] = [a[sort.key], b[sort.key]]
+    if (x == null || y == null) return (x == null) - (y == null) // missing values always last
+    return (x < y ? -1 : x > y ? 1 : 0) * sort.dir
+  })
+  const sortBy = (key) => setSort((s) => ({ key, dir: s.key === key ? -s.dir : key === 'score' ? -1 : 1 }))
   return (
     <>
       <p className="muted">All 77 community areas, graded against each other on 311 backlog, ticket close time, and distance to the nearest city health clinic. Grades rate the city's service, not the neighborhood.</p>
@@ -129,8 +152,19 @@ function Scorecard({ areas }) {
       </details>
       <label className="search">Find a neighborhood <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Englewood" /></label>
       <table>
-        <thead><tr><th>Neighborhood</th><th>Grade</th><th>Open</th><th>Avg days</th><th>Nearest clinic</th><th>Requests / 1k residents</th></tr></thead>
+        <thead>
+          <tr>
+            {AREA_COLS.map(([key, label]) => (
+              <th key={key} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
+                <button className="sort" onClick={() => sortBy(key)}>
+                  {label}<span aria-hidden="true">{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}</span>
+                </button>
+              </th>
+            ))}
+          </tr>
+        </thead>
         <tbody>
+          {!shown.length && <tr><td colSpan={AREA_COLS.length} className="muted">No neighborhood matches "{q}".</td></tr>}
           {shown.map((a) => (
             <tr key={a.id}>
               <td>{title(a.name)}</td>
@@ -145,8 +179,7 @@ function Scorecard({ areas }) {
   )
 }
 
-function Fairness({ data, areas }) {
-  const e = useMemo(() => equity(data.byAreaType, data.lowIncome), [data])
+function Fairness({ data, areas, e }) {
   const names = Object.fromEntries(areas.map((a) => [a.id, title(a.name)]))
   const gap = e.poor / e.rich - 1
   const top = e.services[0]

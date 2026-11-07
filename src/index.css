@@ -1,37 +1,66 @@
 :root {
-  --bg: #100c0a; --card: #191310; --border: #332a22; --text: #f7f2ec; --muted: #a09488;
-  --accent: #f59e0b; --accent-soft: #2e2410;
+  /* Palette: forest #152b12, olive #4b5224, gold #f3db91, rose #ae7465. Rose is 3.96:1 on bg, so never body text. */
+  --bg: #152b12; --card: #1f3215; --border: #4b5224; --text: #f7f2e4; --muted: #b3a768;
+  --accent: #f3db91; --accent-dark: #ae7465; --accent-soft: #2d3d1a;
   color-scheme: dark;
-  font-family: system-ui, sans-serif;
+  /* Built for low-vision readers by the Braille Institute; bundled so it works offline. */
+  font-family: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  line-height: 1.5;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); }
+a, button, summary, .sort, nav a, .finding, .close { transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 .page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
-header { display: flex; gap: 12px; align-items: center; }
+header { display: flex; gap: 12px; align-items: flex-start; }
+.status { display: inline-flex; align-items: center; gap: 6px; margin: 8px 0 0; padding: 3px 10px; border-radius: 999px;
+  font-size: 0.8rem; border: 1px solid var(--border); color: var(--muted); }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.status.live { color: var(--text); }
+.status.live::before { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+.finding { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; align-items: center; margin-bottom: 16px;
+  padding: 16px 18px; border: 1px solid var(--accent-dark); border-radius: 10px; color: var(--text); text-decoration: none;
+  background: linear-gradient(90deg, var(--accent-soft), var(--card)); }
+.finding strong { grid-row: span 2; font-size: 2rem; color: var(--accent); white-space: nowrap; }
+.finding .cta { color: var(--accent); font-size: 0.9rem; }
+.finding:hover { border-color: var(--accent); }
+.finding:hover .cta { text-decoration: underline; }
+@media (max-width: 520px) { .finding { grid-template-columns: 1fr; } .finding strong { grid-row: auto; } }
 h1 { margin: 0; font-size: 1.6rem; }
 h2 { font-size: 1.1rem; margin: 28px 0 8px; }
 .muted { color: var(--muted); margin: 4px 0; }
 .error { color: #fca5a5; }
 /* One scrollable row on phones instead of five stacked rows. */
-nav { display: flex; gap: 6px; margin: 20px 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
-nav a { flex: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 10px 12px; text-decoration: none; white-space: nowrap; }
+nav { display: flex; gap: 6px; margin: 20px 0; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+nav::-webkit-scrollbar { display: none; }
+nav a { flex: none; display: flex; align-items: center; min-height: 44px; border-bottom: 2px solid transparent; color: var(--muted); padding: 10px 12px; text-decoration: none; white-space: nowrap; }
 nav a:hover { color: var(--text); }
 nav a[aria-current="page"] { color: var(--accent); border-color: var(--accent); }
-a:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 3px rings: thin outlines vanish on projectors and for low-vision users. */
+a:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
 .kpi strong { font-size: 1.8rem; color: var(--accent); }
 main { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.92rem; }
-th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 1rem; }
+th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 500; }
-td:not(:first-child), th:not(:first-child) { white-space: nowrap; }
+/* Numbers right-aligned with even-width digits so columns compare at a glance. */
+td:not(:first-child), th:not(:first-child) { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--card); }
+.sort { all: unset; cursor: pointer; display: inline-flex; align-items: center; min-height: 44px; }
+.sort:hover { color: var(--text); }
+.sort:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+th[aria-sort] { color: var(--accent); }
 .bar { display: inline-block; width: 60px; height: 6px; background: var(--accent-soft); border-radius: 3px; vertical-align: middle; }
 .bar span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
 .stars { color: var(--accent); letter-spacing: 2px; }
 .stars span { color: var(--border); }
 .grade { display: inline-block; width: 28px; text-align: center; border-radius: 6px; font-weight: 700; padding: 2px 0; }
-.gA { background: #14532d; } .gB { background: #365314; } .gC { background: #713f12; } .gD { background: #7c2d12; } .gF { background: #7f1d1d; }
+/* Gold (best) to deep rose (worst); light badges take dark letters so every letter clears 5:1. */
+.grade { border: 1px solid var(--accent-dark); }
+.gA { background: #f3db91; color: var(--bg); } .gB { background: #d7b27f; color: var(--bg); } .gC { background: #bf8e70; color: var(--bg); }
+.gD { background: #8c5446; } .gF { background: #6a3a30; }
 .headline { font-size: 1.25rem; margin: 4px 0 8px; }
 .headline strong { color: var(--accent); }
 /* Scroll the chart on phones instead of shrinking its text to nothing. */
@@ -47,12 +76,35 @@ td:not(:first-child), th:not(:first-child) { white-space: nowrap; }
 .scatter .avg line { stroke: var(--text); stroke-width: 2; }
 .scatter .avg text { fill: var(--text); }
 .scatter .label { fill: var(--text); font-size: 12px; }
-.method { color: var(--muted); margin: 8px 0; font-size: 0.9rem; }
-.method summary { cursor: pointer; color: var(--accent); }
-.search { display: flex; gap: 8px; align-items: center; margin: 12px 0; color: var(--muted); }
-.search input { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 10px; font: inherit; }
+.method { color: var(--muted); margin: 8px 0; font-size: 0.95rem; }
+.method summary { cursor: pointer; color: var(--accent); min-height: 44px; display: flex; align-items: center; }
+.search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; color: var(--muted); }
+.search input { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 10px 12px; min-height: 44px; font: inherit; }
 .map { height: 600px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); }
 /* OSM only serves light tiles; invert them to fit the dark theme. */
 .map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.7); }
 .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0; color: var(--muted); font-size: 0.85rem; }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.search select { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 10px 12px; min-height: 44px; font: inherit; }
+/* Map and neighborhood panel side by side on wide screens, stacked on phones. */
+.map-wrap { display: grid; gap: 12px; }
+.map-wrap.open { grid-template-columns: 1fr 340px; }
+@media (max-width: 860px) { .map-wrap.open { grid-template-columns: 1fr; } }
+.area-panel { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; max-height: 600px; overflow-y: auto; }
+.area-panel h2 { margin: 0 32px 12px 0; display: flex; gap: 10px; align-items: center; }
+.area-panel h3 { font-size: 0.95rem; margin: 16px 0 8px; }
+.area-panel dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
+.area-panel dt { color: var(--muted); font-size: 0.8rem; }
+.area-panel dd { margin: 0; font-size: 1.2rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.area-panel ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.area-panel li { display: flex; flex-direction: column; gap: 2px; font-size: 0.9rem; }
+.area-panel li .muted { margin: 0; }
+.close { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; background: none; border: 0; color: var(--muted); font-size: 1.5rem; cursor: pointer; line-height: 1; }
+.close:hover { color: var(--text); }
+i.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+.place { display: flex; flex-direction: column; gap: 3px; min-width: 200px; }
+.place .go { font-weight: 600; margin-top: 4px; }
+a { color: var(--accent); }
+.leaflet-popup-content a { color: #714b42; } /* popups are white: dark rose keeps links readable (7.5:1) */
+/* The clinic list is text, not numbers: keep it left-aligned and let addresses wrap. */
+.places td:not(:first-child), .places th:not(:first-child) { text-align: left; white-space: normal; }

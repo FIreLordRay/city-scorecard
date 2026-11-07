@@ -72,6 +72,8 @@ export function scoreAreas({ geo, areas, clinics, pop }) {
 }
 
 export const title = (s) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+export const fmt = (n, d = 0) => (n == null || !isFinite(n) ? '–' : n.toLocaleString(undefined, { maximumFractionDigits: d }))
+export const pct = (x) => `${Math.round(x * 100)}%`
 
 const avg = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length
 const fifths = (xs) => {
