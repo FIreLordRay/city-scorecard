@@ -8,7 +8,8 @@ const STATS = "count(*) as n, sum(case(status='Open',1,true,0)) as open, avg(dat
 const INCOME_BINS = ['under_25_000', '_25_000_to_49_999', '_50_000_to_74_999', '_75_000_to_125_000', '_125_000']
 
 async function soql(id, params, ext = 'json') {
-  const res = await fetch(`${API}/${id}.${ext}?` + new URLSearchParams(params))
+  // The portal sometimes takes a minute or hangs; give up at 90s so the page settles on saved data.
+  const res = await fetch(`${API}/${id}.${ext}?` + new URLSearchParams(params), { signal: AbortSignal.timeout(90_000) })
   if (!res.ok) throw new Error(`Chicago Data Portal ${id}: HTTP ${res.status}`)
   return res.json()
 }
