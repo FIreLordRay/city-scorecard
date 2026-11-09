@@ -2,28 +2,62 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import { MapContainer, TileLayer, GeoJSON, CircleMarker, Popup, useMap } from 'react-leaflet'
 import { title, centroid, km, fmt, pct } from './score.js'
+import { lazy, Suspense } from 'react'
+import { CITY_311_URL, feedbackUrl } from './config.js'
+
+// three.js is large, so it only downloads when someone opens the 3D view.
+const Health3D = lazy(() => import('./Health3D.jsx'))
 
 // Gold (close) to deep rose (far): lightness falls steadily so the order reads without the legend.
 const BINS = [[2, '#f3db91'], [4, '#d7b27f'], [6, '#bf8e70'], [8, '#ae7465'], [Infinity, '#785a48']]
 const color = (d) => BINS.find(([max]) => d < max)[1]
-const KINDS = { center: ['Community health center', '#5eead4'], city: ['City health clinic', '#f7f2e4'] }
+export const KINDS = { center: ['Community health center', '#5eead4'], city: ['City health clinic', '#f7f2e4'] }
 // Google Maps directions URL; with no origin it starts from the visitor's current location.
-const directions = (p) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${p.address}, Chicago, IL ${p.zip}`.trim())}`
+export const directions = (p) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${p.address}, Chicago, IL ${p.zip}`.trim())}`
+
+// One shape for both sources so the map popups, the list and the neighborhood report render the same way.
+export const buildPlaces = (centers, clinics) => [
+  ...centers.map((c) => ({ ...c, kind: 'center', detail: c.org, hours: c.hours && `${c.hours} hours a week` })),
+  ...clinics.map((c) => ({
+    kind: 'city', name: c.site_name, detail: c.clinic_type, address: c.street_address, zip: '',
+    phone: c.phone_1, hours: c.hours_of_operation, web: null, lat: c.lat, lng: c.lng,
+  })),
+]
+
+// The closest few places to a neighborhood's center.
+// shortcut: straight-line distance from the area's center, not travel time; directions give the real route.
+export function nearestPlaces(area, places, count = 5) {
+  const c = centroid(area.feature.geometry)
+  const seen = new Set() // HRSA lists some clinics once per suite; show each clinic once
+  return places.map((p) => ({ ...p, d: km(c, [p.lat, p.lng]) })).sort((a, b) => a.d - b.d)
+    .filter((p) => !seen.has(p.name) && seen.add(p.name)).slice(0, count)
+}
+
+export function Voice({ name }) {
+  const form = feedbackUrl(name)
+  return (
+    <section className="voice" aria-label="Have your say">
+      <h3>Your voice</h3>
+      <p className="muted small">311 only counts what people report. If something in {name} needs fixing, a request puts it on the record.</p>
+      <a className="btn" href={CITY_311_URL} target="_blank" rel="noopener noreferrer">Report a problem to 311 →</a>
+      {form && (
+        <>
+          <p className="muted small">Wrong hours, a clinic that closed, or something that makes care hard to reach? Tell us. Please don't share health details or personal information.</p>
+          <a className="btn" href={form} target="_blank" rel="noopener noreferrer">Tell us what's missing →</a>
+        </>
+      )}
+    </section>
+  )
+}
 
 export default function HealthMap({ areas, clinics, centers }) {
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(null)
+  const [view, setView] = useState('map')
   const byId = Object.fromEntries(areas.map((a) => [a.id, a]))
   const area = sel && byId[sel]
   const features = { type: 'FeatureCollection', features: areas.map((a) => a.feature) }
-  // One shape for both sources so the map popups and the list below render the same way.
-  const places = [
-    ...centers.map((c) => ({ ...c, kind: 'center', detail: c.org, hours: c.hours && `${c.hours} hours a week` })),
-    ...clinics.map((c) => ({
-      kind: 'city', name: c.site_name, detail: c.clinic_type, address: c.street_address, zip: '',
-      phone: c.phone_1, hours: c.hours_of_operation, web: null, lat: c.lat, lng: c.lng,
-    })),
-  ]
+  const places = buildPlaces(centers, clinics)
   const needle = q.trim().toLowerCase()
   const shown = places
     .filter((p) => !needle || `${p.name} ${p.address} ${p.zip} ${p.detail}`.toLowerCase().includes(needle))
@@ -48,7 +82,18 @@ export default function HealthMap({ areas, clinics, centers }) {
         </select>
         <span className="muted">or click one on the map</span>
       </label>
+      <div className="viewtoggle" role="group" aria-label="Map style">
+        {[['map', 'Flat map'], ['3d', '3D view']].map(([k, label]) => (
+          <button key={k} aria-pressed={view === k} onClick={() => setView(k)}>{label}</button>
+        ))}
+        {view === '3d' && <span className="muted small">Height = distance to the nearest city clinic. Taller means farther from care.</span>}
+      </div>
       <div className={area ? 'map-wrap open' : 'map-wrap'}>
+      {view === '3d' ? (
+        <Suspense fallback={<div className="map muted" role="status">Loading 3D view…</div>}>
+          <Health3D areas={areas} places={places} kinds={KINDS} color={color} sel={sel} setSel={setSel} />
+        </Suspense>
+      ) : (
       <MapContainer center={[41.84, -87.68]} zoom={10} className="map">
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -77,6 +122,7 @@ export default function HealthMap({ areas, clinics, centers }) {
           </CircleMarker>
         ))}
       </MapContainer>
+      )}
       {area && <AreaPanel area={area} places={places} onClose={() => setSel(null)} />}
       </div>
 
@@ -115,11 +161,7 @@ function AreaPanel({ area, places, onClose }) {
   const ref = useRef(null)
   // On phones the panel sits below the map; bring it into view. No-op when it's already visible.
   useEffect(() => { ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) }, [area])
-  const c = centroid(area.feature.geometry)
-  // shortcut: straight-line distance from the area's center, not travel time; directions give the real route.
-  const seen = new Set() // HRSA lists some clinics once per suite; show each clinic once
-  const nearest = places.map((p) => ({ ...p, d: km(c, [p.lat, p.lng]) })).sort((a, b) => a.d - b.d)
-    .filter((p) => !seen.has(p.name) && seen.add(p.name)).slice(0, 5)
+  const nearest = nearestPlaces(area, places)
   return (
     <aside className="area-panel" ref={ref} aria-live="polite">
       <button className="close" onClick={onClose} aria-label="Close neighborhood details">×</button>
@@ -130,6 +172,8 @@ function AreaPanel({ area, places, onClose }) {
         <div><dt>Requests / 1k residents</dt><dd>{fmt(area.perK)}</dd></div>
         <div><dt>Nearest city clinic</dt><dd>{fmt(area.clinicKm, 1)} km</dd></div>
       </dl>
+      <a className="btn" href={`#neighborhood/${area.id}`}>Full neighborhood report →</a>
+      <Voice name={title(area.name)} />
       <h3>Closest free or low-cost care</h3>
       <ol>
         {nearest.map((p) => (

@@ -1,23 +1,35 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ClipboardList, Star, LayoutGrid, MapPin, Scale } from 'lucide-react'
+import { ClipboardList, Star, LayoutGrid, MapPin, Scale, Box, House } from 'lucide-react'
 import { loadAll, DAYS } from './data.js'
 import { rateServices, scoreAreas, equity, title, fmt, pct } from './score.js'
 import HealthMap from './HealthMap.jsx'
+import Profile from './Profile.jsx'
+import Landing from './Landing.jsx'
+import NeighborhoodSearch from './NeighborhoodSearch.jsx'
 
-const TABS = ['Service tracker', 'Service ratings', 'Neighborhood scorecard', 'Health access map', 'Who waits longer']
+const TABS = ['Service tracker', 'Service ratings', 'Neighborhood scorecard', 'Health access map', 'Who waits longer', '3D skyline']
 const SLUGS = TABS.map((t) => t.toLowerCase().replaceAll(' ', '-'))
-const ICONS = [ClipboardList, Star, LayoutGrid, MapPin, Scale]
+const ICONS = [ClipboardList, Star, LayoutGrid, MapPin, Scale, Box]
 // The open view lives in the URL hash, so refresh and shared links (#who-waits-longer) land on it.
-const tabFromHash = () => Math.max(0, SLUGS.indexOf(location.hash.slice(1)))
+// A neighborhood report lives at #neighborhood/<id> and is no tab, so its tab number is -1.
+const profileFromHash = () => location.hash.match(/^#neighborhood\/(.+)$/)?.[1] ?? null
+// The front door is -2: an empty or unknown hash lands there, so nothing shows until it's asked for.
+const HOME = -2
+const tabFromHash = () => {
+  if (profileFromHash()) return -1
+  const i = SLUGS.indexOf(location.hash.slice(1))
+  return i < 0 ? HOME : i
+}
 
 export default function App() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [tab, setTab] = useState(tabFromHash)
+  const [pid, setPid] = useState(profileFromHash)
   const [centers, setCenters] = useState([])
 
   useEffect(() => {
-    const onHash = () => setTab(tabFromHash())
+    const onHash = () => { setTab(tabFromHash()); setPid(profileFromHash()); window.scrollTo(0, 0) }
     addEventListener('hashchange', onHash)
     return () => removeEventListener('hashchange', onHash)
   }, [])
@@ -37,8 +49,9 @@ export default function App() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <p className="brand">Chicago City Scorecard</p>
+        <p className="brand"><a href="#home">Chicago City Scorecard</a></p>
         <nav aria-label="Views">
+          <a href="#home" aria-current={tab === HOME ? 'page' : undefined}><House size={18} aria-hidden="true" />Home</a>
           {TABS.map((t, i) => {
             const Icon = ICONS[i]
             return (
@@ -51,25 +64,29 @@ export default function App() {
         <p className="muted small">311 requests, census income and clinic data from the Chicago Data Portal and HRSA.</p>
       </aside>
       <div className="content">
-        <header className="topbar">
+        {tab !== HOME && <header className="topbar">
           <div>
-            <h1>{TABS[tab]}</h1>
+            <h1>{pid ? (areas ? title(areas.find((a) => a.id === pid)?.name ?? 'Neighborhood') : 'Neighborhood') : TABS[tab]}</h1>
             <p className="muted">How well is the city serving its residents? Last {DAYS} days of 311 data.</p>
           </div>
+          {areas && <NeighborhoodSearch areas={areas} />}
           {data && (
             <p className={`status ${saved ? 'saved' : 'live'}`} role="status">
               {!saved ? 'Live data' : error ? `Saved data from ${saved} · live data unavailable` : `Saved data from ${saved} · checking for live data…`}
             </p>
           )}
-        </header>
+        </header>}
         <main className="panel" aria-busy={!data && !error}>
         {error && !data && <p role="alert" className="error">Could not load city data: {error}</p>}
         {!data && !error && <p className="muted" role="status">Loading city data…</p>}
+        {tab === HOME && <Landing areas={areas} />}
         {data && tab === 0 && <><Finding e={eq} /><Tracker types={data.types} /></>}
         {data && tab === 1 && <Ratings types={data.types} />}
         {data && tab === 2 && <Scorecard areas={areas} />}
         {data && tab === 3 && <HealthMap areas={areas} clinics={data.clinics} centers={centers} />}
         {data && tab === 4 && <Fairness data={data} areas={areas} e={eq} />}
+        {data && pid && <Profile id={pid} areas={areas} eq={eq} clinics={data.clinics} centers={centers} />}
+        {tab === 5 && <Skyline />}
         </main>
       </div>
     </div>
@@ -89,12 +106,22 @@ function Finding({ e }) {
   )
 }
 
+const SORTS = [
+  ['n', 'Most requested', (t) => t.n],
+  ['days', 'Slowest to close', (t) => t.days ?? -1],
+  ['open', 'Most still open', (t) => t.open / t.n],
+]
+
 function Tracker({ types }) {
+  const [sort, setSort] = useState('n')
   const total = types.reduce((s, t) => s + t.n, 0)
   const open = types.reduce((s, t) => s + t.open, 0)
   const closed = types.filter((t) => t.days != null)
   // Average close time weighted by how many requests of each type were closed.
   const avgDays = closed.reduce((s, t) => s + t.days * (t.n - t.open), 0) / closed.reduce((s, t) => s + t.n - t.open, 0)
+  const by = SORTS.find(([k]) => k === sort)[2]
+  const rows = [...types].sort((a, b) => by(b) - by(a)).slice(0, 20)
+  const maxN = Math.max(...rows.map((t) => t.n))
   return (
     <>
       <div className="kpis">
@@ -102,40 +129,63 @@ function Tracker({ types }) {
         <Kpi label="Still open" value={fmt(open)} note={pct(open / total)} />
         <Kpi label="Avg days to close" value={fmt(avgDays, 1)} />
       </div>
-      <h2>Most requested services</h2>
-      <table>
-        <thead><tr><th>Service</th><th>Requests</th><th>Open</th><th>Avg days to close</th></tr></thead>
-        <tbody>
-          {types.slice(0, 20).map((t) => (
-            <tr key={t.sr_type}>
-              <td>{t.sr_type}</td><td>{fmt(t.n)}</td>
-              <td><Bar value={t.open / t.n} /> {pct(t.open / t.n)}</td>
-              <td>{fmt(t.days, 1)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="list-head">
+        <h2>Top 20 services</h2>
+        <div className="seg" role="group" aria-label="Sort services">
+          {SORTS.map(([k, label]) => <button key={k} aria-pressed={sort === k} onClick={() => setSort(k)}>{label}</button>)}
+        </div>
+      </div>
+      <ol className="svc-list">
+        {rows.map((t) => {
+          const slow = t.days != null && t.days > avgDays
+          return (
+            <li key={t.sr_type}>
+              <div className="svc-head"><b>{t.sr_type}</b><span className="muted">{fmt(t.n)} requests</span></div>
+              <div className="meter" role="img" aria-label={`${fmt(t.n)} requests`}><span style={{ width: `${(t.n / maxN) * 100}%` }} /></div>
+              <div className="svc-stats">
+                <span className="chip">{pct(t.open / t.n)} still open</span>
+                <span className={slow ? 'chip slow' : 'chip fast'}>{t.days == null ? 'No close time' : `${fmt(t.days, 1)} days to close`}</span>
+              </div>
+            </li>
+          )
+        })}
+      </ol>
     </>
   )
 }
+
+const TIERS = { 5: 'Best rated', 4: 'Above average', 3: 'Middle of the pack', 2: 'Below average', 1: 'Lowest rated' }
 
 function Ratings({ types }) {
   const rated = rateServices(types)
   return (
     <>
       <p className="muted">Stars are computed from 311 records, not resident votes. Each service with 100+ requests is ranked against the others on how fast tickets get closed and how many are still open. A closed ticket means the city marked it done, not that the fix was checked.</p>
-      <table>
-        <thead><tr><th>Service</th><th>Rating</th><th>Closed</th><th>Avg days</th><th>Requests</th></tr></thead>
-        <tbody>
-          {rated.map((t) => (
-            <tr key={t.sr_type}>
-              <td>{t.sr_type}</td>
-              <td className="stars" aria-label={`${t.stars} out of 5 stars`}>{'★'.repeat(t.stars)}<span>{'★'.repeat(5 - t.stars)}</span></td>
-              <td>{pct(1 - t.open / t.n)}</td><td>{fmt(t.days, 1)}</td><td>{fmt(t.n)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {[5, 4, 3, 2, 1].map((n) => {
+        const group = rated.filter((t) => t.stars === n)
+        if (!group.length) return null
+        return (
+          <section key={n} className="tier">
+            <h2>
+              <span className="stars" aria-hidden="true">{'★'.repeat(n)}<span>{'★'.repeat(5 - n)}</span></span>
+              {TIERS[n]} <span className="muted small">{n} out of 5 stars · {group.length} {group.length === 1 ? 'service' : 'services'}</span>
+            </h2>
+            <div className="cards">
+              {group.map((t) => (
+                <div key={t.sr_type} className="card">
+                  <b>{t.sr_type}</b>
+                  <div className="meter" role="img" aria-label={`${pct(1 - t.open / t.n)} closed`}><span style={{ width: pct(1 - t.open / t.n) }} /></div>
+                  <dl>
+                    <div><dt>Closed</dt><dd>{pct(1 - t.open / t.n)}</dd></div>
+                    <div><dt>Avg days</dt><dd>{fmt(t.days, 1)}</dd></div>
+                    <div><dt>Requests</dt><dd>{fmt(t.n)}</dd></div>
+                  </dl>
+                </div>
+              ))}
+            </div>
+          </section>
+        )
+      })}
     </>
   )
 }
@@ -180,7 +230,7 @@ function Scorecard({ areas }) {
           {!shown.length && <tr><td colSpan={AREA_COLS.length} className="muted">No neighborhood matches "{q}".</td></tr>}
           {shown.map((a) => (
             <tr key={a.id}>
-              <td>{title(a.name)}</td>
+              <td><a href={`#neighborhood/${a.id}`}>{title(a.name)}</a></td>
               <td><span className={`grade g${a.grade}`}>{a.grade}</span></td>
               <td>{pct(a.openShare)}</td><td>{fmt(a.days, 1)}</td>
               <td>{fmt(a.clinicKm, 1)} km</td><td>{fmt(a.perK)}</td>
@@ -299,6 +349,18 @@ function Scatter({ points, rich, poor }) {
         })}
       </svg>
     </div>
+  )
+}
+
+// Pre-rendered in Blender (see blender/skyline.py), so it is a snapshot, not live data.
+function Skyline() {
+  return (
+    <>
+      <p className="muted">Each neighborhood is raised by how long its 311 requests take to close compared with the city average for the same kinds of requests. Gold is faster than average, olive is average, rose is slower.</p>
+      <video className="skyline" src="./skyline_loop.mp4" poster="./skyline.png" controls loop muted autoPlay playsInline
+        aria-label="Ten-second spinning 3D model of Chicago neighborhoods raised by wait time" />
+      <p className="muted small">Rendered from the saved snapshot. Rebuild it with the Blender steps in the README after refreshing the data. <a href="./skyline.png" target="_blank" rel="noreferrer">Open the still image</a>.</p>
+    </>
   )
 }
 
