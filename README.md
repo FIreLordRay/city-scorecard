@@ -46,6 +46,22 @@ Each neighborhood's close times are compared with the city average for its own m
 
 Limits: it shows that income and wait time go together, not why. It only counts tickets the city closed. Grades are relative, so some area always gets an F.
 
+## 3D wait-time skyline (Blender)
+
+![Wait-time skyline](blender/skyline.png)
+
+[Watch the 10-second spinning version](blender/skyline_loop.mp4)
+
+Each neighborhood is raised by its wait index: gold is faster than the city average for the same requests, olive is average, rose is slower. Built from the same data and `equity()` math as the app.
+
+```bash
+node blender/export.js
+blender -b -P blender/skyline.py              # still -> blender/skyline.png
+blender -b -P blender/skyline.py -- anim      # 10 s spinning loop -> blender/skyline_loop.mp4
+```
+
+With the Microsoft Store install, run `blender-launcher.exe` in place of `blender`.
+
 ## Tests
 
 ```bash

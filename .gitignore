@@ -1,2 +1,6 @@
 node_modules/
 dist/
+blender/*.blend
+blender/*.blend1
+blender/skyline_preview.png
+blender/skyline-data.json
