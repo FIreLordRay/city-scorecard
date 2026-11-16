@@ -38,11 +38,11 @@ export function Voice({ name }) {
   return (
     <section className="voice" aria-label="Have your say">
       <h3>Your voice</h3>
-      <p className="muted small">311 only counts what people report. If something in {name} needs fixing, a request puts it on the record.</p>
+      <p className="muted small">311 only counts what gets reported.</p>
       <a className="btn" href={CITY_311_URL} target="_blank" rel="noopener noreferrer">Report a problem to 311 →</a>
       {form && (
         <>
-          <p className="muted small">Wrong hours, a clinic that closed, or something that makes care hard to reach? Tell us. Please don't share health details or personal information.</p>
+          <p className="muted small">Wrong hours or a closed clinic? Tell us. No health or personal details, please.</p>
           <a className="btn" href={form} target="_blank" rel="noopener noreferrer">Tell us what's missing →</a>
         </>
       )}
@@ -66,8 +66,7 @@ export default function HealthMap({ areas, clinics, centers }) {
   return (
     <>
       <p className="muted">
-        Free and low-cost care: {centers.length} community health centers (federally funded, they see everyone and charge on a sliding scale down to $0, insured or not) and {clinics.length} city health clinics (WIC, mental health, STI).
-        Neighborhoods are shaded by distance to the nearest city clinic. Click any dot for hours, phone and directions.
+        {centers.length} community health centers (sliding scale, down to $0) and {clinics.length} city clinics. Shading is distance to the nearest city clinic. Click a dot for details.
       </p>
       <div className="legend">
         {Object.values(KINDS).map(([label, c]) => <span key={label}><i className="dot" style={{ background: c }} />{label}</span>)}
@@ -75,18 +74,17 @@ export default function HealthMap({ areas, clinics, centers }) {
           <span key={c}><i style={{ background: c }} />{max === Infinity ? `${BINS[i - 1][0]}+ km` : `under ${max} km`}</span>
         ))}
       </div>
-      <label className="search">Pick a neighborhood
+      <label className="search">Neighborhood
         <select value={sel ?? ''} onChange={(e) => setSel(e.target.value || null)}>
           <option value="">All of Chicago</option>
           {[...areas].sort((a, b) => a.name.localeCompare(b.name)).map((a) => <option key={a.id} value={a.id}>{title(a.name)}</option>)}
         </select>
-        <span className="muted">or click one on the map</span>
       </label>
       <div className="viewtoggle" role="group" aria-label="Map style">
         {[['map', 'Flat map'], ['3d', '3D view']].map(([k, label]) => (
           <button key={k} aria-pressed={view === k} onClick={() => setView(k)}>{label}</button>
         ))}
-        {view === '3d' && <span className="muted small">Height = distance to the nearest city clinic. Taller means farther from care.</span>}
+        {view === '3d' && <span className="muted small">Taller is farther from care.</span>}
       </div>
       <div className={area ? 'map-wrap open' : 'map-wrap'}>
       {view === '3d' ? (
@@ -127,7 +125,7 @@ export default function HealthMap({ areas, clinics, centers }) {
       </div>
 
       <h2>Find free or low-cost care</h2>
-      <label className="search">Search by name, street or ZIP <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. 60624" /></label>
+      <label className="search">Name, street or ZIP <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. 60624" /></label>
       <table className="places">
         <thead><tr><th>Clinic</th><th>Address</th><th>Phone</th><th>Directions</th></tr></thead>
         <tbody>

@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ClipboardList, Star, LayoutGrid, MapPin, Scale, Box, House } from 'lucide-react'
+import { ClipboardList, Star, LayoutGrid, MapPin, Scale, House } from 'lucide-react'
 import { loadAll, DAYS } from './data.js'
 import { rateServices, scoreAreas, equity, title, fmt, pct } from './score.js'
 import HealthMap from './HealthMap.jsx'
 import Profile from './Profile.jsx'
 import Landing from './Landing.jsx'
 import NeighborhoodSearch from './NeighborhoodSearch.jsx'
+import Comments from './Comments.jsx'
 
-const TABS = ['Service tracker', 'Service ratings', 'Neighborhood scorecard', 'Health access map', 'Who waits longer', '3D skyline']
+const TABS = ['Service tracker', 'Service ratings', 'Neighborhood scorecard', 'Health access map', 'Who waits longer']
 const SLUGS = TABS.map((t) => t.toLowerCase().replaceAll(' ', '-'))
-const ICONS = [ClipboardList, Star, LayoutGrid, MapPin, Scale, Box]
+const ICONS = [ClipboardList, Star, LayoutGrid, MapPin, Scale]
+// The 3D skyline now lives on the Who waits longer page; old #3d-skyline links land there.
+const ALIASES = { '3d-skyline': 'who-waits-longer' }
 // The open view lives in the URL hash, so refresh and shared links (#who-waits-longer) land on it.
 // A neighborhood report lives at #neighborhood/<id> and is no tab, so its tab number is -1.
 const profileFromHash = () => location.hash.match(/^#neighborhood\/(.+)$/)?.[1] ?? null
@@ -17,7 +20,8 @@ const profileFromHash = () => location.hash.match(/^#neighborhood\/(.+)$/)?.[1] 
 const HOME = -2
 const tabFromHash = () => {
   if (profileFromHash()) return -1
-  const i = SLUGS.indexOf(location.hash.slice(1))
+  const h = location.hash.slice(1)
+  const i = SLUGS.indexOf(ALIASES[h] ?? h)
   return i < 0 ? HOME : i
 }
 
@@ -61,18 +65,18 @@ export default function App() {
             )
           })}
         </nav>
-        <p className="muted small">311 requests, census income and clinic data from the Chicago Data Portal and HRSA.</p>
+        <p className="muted small">Data: City of Chicago, HRSA.</p>
       </aside>
       <div className="content">
         {tab !== HOME && <header className="topbar">
           <div>
             <h1>{pid ? (areas ? title(areas.find((a) => a.id === pid)?.name ?? 'Neighborhood') : 'Neighborhood') : TABS[tab]}</h1>
-            <p className="muted">How well is the city serving its residents? Last {DAYS} days of 311 data.</p>
+            <p className="muted">Last {DAYS} days of 311 data.</p>
           </div>
           {areas && <NeighborhoodSearch areas={areas} />}
           {data && (
             <p className={`status ${saved ? 'saved' : 'live'}`} role="status">
-              {!saved ? 'Live data' : error ? `Saved data from ${saved} · live data unavailable` : `Saved data from ${saved} · checking for live data…`}
+              {!saved ? 'Live data' : error ? `Saved ${saved}` : `Saved ${saved} · updating…`}
             </p>
           )}
         </header>}
@@ -86,7 +90,6 @@ export default function App() {
         {data && tab === 3 && <HealthMap areas={areas} clinics={data.clinics} centers={centers} />}
         {data && tab === 4 && <Fairness data={data} areas={areas} e={eq} />}
         {data && pid && <Profile id={pid} areas={areas} eq={eq} clinics={data.clinics} centers={centers} />}
-        {tab === 5 && <Skyline />}
         </main>
       </div>
     </div>
@@ -100,7 +103,7 @@ function Finding({ e }) {
   return (
     <a className="finding" href="#who-waits-longer">
       <strong>{pct(gap)} longer</strong>
-      <span>The same 311 request takes {pct(gap)} longer to close in Chicago's poorest neighborhoods than in the richest.</span>
+      <span>Same 311 request, poorest vs. richest neighborhoods.</span>
       <span className="cta">See who waits longer →</span>
     </a>
   )
@@ -160,7 +163,7 @@ function Ratings({ types }) {
   const rated = rateServices(types)
   return (
     <>
-      <p className="muted">Stars are computed from 311 records, not resident votes. Each service with 100+ requests is ranked against the others on how fast tickets get closed and how many are still open. A closed ticket means the city marked it done, not that the fix was checked.</p>
+      <p className="muted">Rated on speed and backlog from 311 records, not votes.</p>
       {[5, 4, 3, 2, 1].map((n) => {
         const group = rated.filter((t) => t.stars === n)
         if (!group.length) return null
@@ -168,7 +171,7 @@ function Ratings({ types }) {
           <section key={n} className="tier">
             <h2>
               <span className="stars" aria-hidden="true">{'★'.repeat(n)}<span>{'★'.repeat(5 - n)}</span></span>
-              {TIERS[n]} <span className="muted small">{n} out of 5 stars · {group.length} {group.length === 1 ? 'service' : 'services'}</span>
+              {TIERS[n]} <span className="muted small">{group.length}</span>
             </h2>
             <div className="cards">
               {group.map((t) => (
@@ -204,16 +207,16 @@ function Scorecard({ areas }) {
   const sortBy = (key) => setSort((s) => ({ key, dir: s.key === key ? -s.dir : key === 'score' ? -1 : 1 }))
   return (
     <>
-      <p className="muted">All 77 community areas, graded against each other on 311 backlog, ticket close time, and distance to the nearest city health clinic. Grades rate the city's service, not the neighborhood.</p>
+      <p className="muted">Graded on 311 backlog, close time and clinic distance. Grades rate city service, not the neighborhood.</p>
       <details className="method">
-        <summary>How grades work and what they miss</summary>
+        <summary>How grades work</summary>
         <ul>
-          <li>Each area is ranked on the three measures, the ranks are averaged, and the top fifth gets an A, the bottom fifth an F. Grades are relative, so some area always gets an F.</li>
-          <li>311 counts complaints, not problems. Areas where fewer people call 311 can look better served than they are.</li>
-          <li>Clinic distance is a straight line from the area's center to the nearest of 24 city clinics. It ignores community health centers, hospitals and transit.</li>
+          <li>Ranks on the three measures are averaged. Top fifth gets an A, bottom fifth an F, so some area always gets an F.</li>
+          <li>311 counts complaints, not problems. Areas that call less can look better served.</li>
+          <li>Clinic distance is a straight line to the nearest of 24 city clinics.</li>
         </ul>
       </details>
-      <label className="search">Find a neighborhood <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Englewood" /></label>
+      <label className="search">Filter <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Englewood" /></label>
       <table>
         <thead>
           <tr>
@@ -259,11 +262,11 @@ function Fairness({ data, areas, e }) {
       {top && top.poor > top.rich * 1.5 && (
         <p className="muted">Biggest gap: {top.type}, {fmt(top.rich, 1)} days in the richest areas vs {fmt(top.poor, 1)} in the poorest.</p>
       )}
-      <h2>Neighborhoods with more low-income households wait longer</h2>
-      <p className="muted">Each dot is a neighborhood: how long its requests take compared with the city average for the same kinds of requests.</p>
+      <h2>Lower income, longer wait</h2>
+      <p className="muted">Each dot is a neighborhood.</p>
       <Scatter points={e.areas.map((a) => ({ ...a, name: names[a.id] }))} rich={e.rich} poor={e.poor} />
       <details className="method">
-        <summary>All {e.areas.length} neighborhoods as a table</summary>
+        <summary>See as a table</summary>
         <table>
           <thead><tr><th>Neighborhood</th><th>Wait vs city average</th><th>Households under $25k</th></tr></thead>
           <tbody>
@@ -285,14 +288,19 @@ function Fairness({ data, areas, e }) {
           ))}
         </tbody>
       </table>
+      <h2>In 3D</h2>
+      <p className="muted">Taller is a longer wait. Gold is faster than average, rose is slower.</p>
+      <video className="skyline" src="./skyline_loop.mp4" poster="./skyline.png" controls loop muted autoPlay playsInline
+        aria-label="Spinning 3D model of Chicago neighborhoods raised by wait time" />
       <details className="method">
-        <summary>How this is measured and what it can't tell you</summary>
+        <summary>How it's measured</summary>
         <ul>
-          <li>Each neighborhood's close times are compared with the city average for its own mix of requests, so an area isn't penalized for filing slower kinds of requests. Same-day services are left out.</li>
-          <li>"Richest" and "poorest" fifth are the areas with the smallest and largest share of households earning under $25k (Census ACS).</li>
-          <li>It only counts tickets that were closed, over the last {DAYS} days. It shows that income and wait go together, not why. District staffing could be the reason.</li>
+          <li>Each area is compared with the city average for its own mix of requests. Same-day services are left out.</li>
+          <li>Richest and poorest fifth: smallest and largest share of households under $25k (Census).</li>
+          <li>Closed tickets only, last {DAYS} days. Shows income and wait go together, not why.</li>
         </ul>
       </details>
+      <Comments topic="who-waits-longer" question="Does this match what you see in your neighborhood?" />
     </>
   )
 }
@@ -349,18 +357,6 @@ function Scatter({ points, rich, poor }) {
         })}
       </svg>
     </div>
-  )
-}
-
-// Pre-rendered in Blender (see blender/skyline.py), so it is a snapshot, not live data.
-function Skyline() {
-  return (
-    <>
-      <p className="muted">Each neighborhood is raised by how long its 311 requests take to close compared with the city average for the same kinds of requests. Gold is faster than average, olive is average, rose is slower.</p>
-      <video className="skyline" src="./skyline_loop.mp4" poster="./skyline.png" controls loop muted autoPlay playsInline
-        aria-label="Ten-second spinning 3D model of Chicago neighborhoods raised by wait time" />
-      <p className="muted small">Rendered from the saved snapshot. Rebuild it with the Blender steps in the README after refreshing the data. <a href="./skyline.png" target="_blank" rel="noreferrer">Open the still image</a>.</p>
-    </>
   )
 }
 

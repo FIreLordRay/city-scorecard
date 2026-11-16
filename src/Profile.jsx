@@ -1,4 +1,5 @@
 import { title, fmt, pct, pctRank, gradeOf } from './score.js'
+import Comments from './Comments.jsx'
 import { buildPlaces, nearestPlaces, directions, KINDS, Voice } from './HealthMap.jsx'
 
 // A report card for one neighborhood, in the spirit of a neighborhood guide: overall grade, a grade per
@@ -27,7 +28,7 @@ export default function Profile({ id, areas, eq, clinics, centers }) {
         <span className={`grade big g${a.grade}`} aria-label={`Overall grade ${a.grade}`}>{a.grade}</span>
         <div>
           <h2>{name}</h2>
-          <p className="muted">Ranked <strong>#{rank + 1}</strong> of {areas.length} Chicago neighborhoods for city service. Grades are relative, so some area always gets an F, and they rate the city's service, not the neighborhood or its people.</p>
+          <p className="muted">Ranked <strong>#{rank + 1}</strong> of {areas.length} for city service. Grades rate the city, not residents.</p>
         </div>
       </section>
 
@@ -60,6 +61,7 @@ export default function Profile({ id, areas, eq, clinics, centers }) {
         ))}
       </ol>
 
+      <Comments topic={`neighborhood/${id}`} question={`Is this grade fair for ${name}?`} />
       <Voice name={name} />
       <p><a href="#health-access-map">See the health access map →</a> · <a href="#neighborhood-scorecard">All neighborhoods →</a></p>
     </>
