@@ -14,8 +14,8 @@ export default function Landing({ areas }) {
   return (
     <>
       <section className="landing-hero">
-        <h1>How well is Chicago serving you?</h1>
-        <p className="lede">Look up your neighborhood, or pick a question.</p>
+        <h1>One city. Different people. Same Pulse?</h1>
+        <p className="lede">How well is Chicago serving your neighborhood? Look it up, or pick a question.</p>
         <div className="landing-search">
           {areas
             ? <NeighborhoodSearch areas={areas} large />

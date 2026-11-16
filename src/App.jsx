@@ -7,19 +7,23 @@ import Profile from './Profile.jsx'
 import Landing from './Landing.jsx'
 import NeighborhoodSearch from './NeighborhoodSearch.jsx'
 import Comments from './Comments.jsx'
+import { CITY_311_URL } from './config.js'
 
 const TABS = ['Service tracker', 'Service ratings', 'Neighborhood scorecard', 'Health access map', 'Who waits longer']
 const SLUGS = TABS.map((t) => t.toLowerCase().replaceAll(' ', '-'))
 const ICONS = [ClipboardList, Star, LayoutGrid, MapPin, Scale]
-// The 3D skyline now lives on the Who waits longer page; old #3d-skyline links land there.
+// The 3D skyline page was removed; old #3d-skyline links land on the related wait-time page.
 const ALIASES = { '3d-skyline': 'who-waits-longer' }
 // The open view lives in the URL hash, so refresh and shared links (#who-waits-longer) land on it.
 // A neighborhood report lives at #neighborhood/<id> and is no tab, so its tab number is -1.
 const profileFromHash = () => location.hash.match(/^#neighborhood\/(.+)$/)?.[1] ?? null
+// The Service tracker can be opened for one neighborhood: #service-tracker/<id>.
+const trackerAreaFromHash = () => location.hash.match(/^#service-tracker\/(.+)$/)?.[1] ?? null
 // The front door is -2: an empty or unknown hash lands there, so nothing shows until it's asked for.
 const HOME = -2
 const tabFromHash = () => {
   if (profileFromHash()) return -1
+  if (trackerAreaFromHash()) return 0
   const h = location.hash.slice(1)
   const i = SLUGS.indexOf(ALIASES[h] ?? h)
   return i < 0 ? HOME : i
@@ -30,10 +34,11 @@ export default function App() {
   const [error, setError] = useState(null)
   const [tab, setTab] = useState(tabFromHash)
   const [pid, setPid] = useState(profileFromHash)
+  const [tid, setTid] = useState(trackerAreaFromHash)
   const [centers, setCenters] = useState([])
 
   useEffect(() => {
-    const onHash = () => { setTab(tabFromHash()); setPid(profileFromHash()); window.scrollTo(0, 0) }
+    const onHash = () => { setTab(tabFromHash()); setPid(profileFromHash()); setTid(trackerAreaFromHash()); window.scrollTo(0, 0) }
     addEventListener('hashchange', onHash)
     return () => removeEventListener('hashchange', onHash)
   }, [])
@@ -53,7 +58,7 @@ export default function App() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <p className="brand"><a href="#home">Chicago City Scorecard</a></p>
+        <p className="brand"><a href="#home">Pulse</a></p>
         <nav aria-label="Views">
           <a href="#home" aria-current={tab === HOME ? 'page' : undefined}><House size={18} aria-hidden="true" />Home</a>
           {TABS.map((t, i) => {
@@ -84,7 +89,7 @@ export default function App() {
         {error && !data && <p role="alert" className="error">Could not load city data: {error}</p>}
         {!data && !error && <p className="muted" role="status">Loading city data…</p>}
         {tab === HOME && <Landing areas={areas} />}
-        {data && tab === 0 && <><Finding e={eq} /><Tracker types={data.types} /></>}
+        {data && tab === 0 && <><Finding e={eq} /><Tracker types={data.types} byAreaType={data.byAreaType} areas={areas} areaId={tid} /></>}
         {data && tab === 1 && <Ratings types={data.types} />}
         {data && tab === 2 && <Scorecard areas={areas} />}
         {data && tab === 3 && <HealthMap areas={areas} clinics={data.clinics} centers={centers} />}
@@ -109,50 +114,111 @@ function Finding({ e }) {
   )
 }
 
+// The bar in each row shows whatever the list is sorted by.
 const SORTS = [
   ['n', 'Most requested', (t) => t.n],
-  ['days', 'Slowest to close', (t) => t.days ?? -1],
-  ['open', 'Most still open', (t) => t.open / t.n],
+  ['days', 'Slowest', (t) => t.days ?? -1],
+  ['open', 'Most open', (t) => t.open / t.n],
 ]
 
-function Tracker({ types }) {
+// Average close time weighted by how many requests of each type were closed.
+const avgClose = (rows) => {
+  const closed = rows.filter((t) => t.days != null && t.n > t.open)
+  const w = closed.reduce((s, t) => s + t.n - t.open, 0)
+  return w ? closed.reduce((s, t) => s + t.days * (t.n - t.open), 0) / w : null
+}
+const signed = (d) => `${d > 0 ? '+' : '−'}${fmt(Math.abs(d), 1)}`
+
+// One plain sentence that says what the numbers mean for the view that's open.
+function summary(rows, cityDays, name, avgDays) {
+  if (!name) {
+    const slow = [...rows].sort((a, b) => b.n - a.n).slice(0, 10).filter((t) => t.days != null).sort((a, b) => b.days - a.days)[0]
+    return <>Across Chicago, requests take <strong>{fmt(avgDays, 1)} days</strong> to close. The slowest common one is {slow.sr_type}, at <strong>{fmt(slow.days, 1)} days</strong>.</>
+  }
+  // Only services with enough closed requests here to compare fairly.
+  const cmp = rows.filter((t) => t.days != null && t.n - t.open >= 10 && cityDays[t.sr_type] != null)
+    .map((t) => ({ ...t, diff: t.days - cityDays[t.sr_type] })).sort((a, b) => b.diff - a.diff)
+  const worst = cmp[0]
+  if (worst && worst.diff >= 1) {
+    return <>In {name}, {worst.sr_type} takes <strong>{fmt(worst.days, 1)} days</strong> to close, <strong>{fmt(worst.diff, 1)} days longer</strong> than the city average.</>
+  }
+  return <>In {name}, common requests close about as fast as the rest of the city, or faster.</>
+}
+
+function Tracker({ types, byAreaType, areas, areaId }) {
   const [sort, setSort] = useState('n')
-  const total = types.reduce((s, t) => s + t.n, 0)
-  const open = types.reduce((s, t) => s + t.open, 0)
-  const closed = types.filter((t) => t.days != null)
-  // Average close time weighted by how many requests of each type were closed.
-  const avgDays = closed.reduce((s, t) => s + t.days * (t.n - t.open), 0) / closed.reduce((s, t) => s + t.n - t.open, 0)
+  const [all, setAll] = useState(false)
+  const area = areaId && areas.find((a) => a.id === areaId)
+  const name = area && title(area.name)
+  const cityDays = Object.fromEntries(types.map((t) => [t.sr_type, t.days]))
+  const cityAvg = avgClose(types)
+  // In a neighborhood, skip types with only a handful of requests; they swing too much to rank.
+  const scope = area ? byAreaType.filter((r) => r.community_area === area.id && r.n >= 5) : types
+  const total = scope.reduce((s, t) => s + t.n, 0)
+  const open = scope.reduce((s, t) => s + t.open, 0)
+  const avgDays = area ? avgClose(scope) : cityAvg
+  // Types closed within ~2 hours citywide are office paperwork (parking reviews, Divvy complaints), not
+  // services residents wait on. Graffiti removal (~0.4 days) stays.
+  const services = scope.filter((t) => cityDays[t.sr_type] == null || cityDays[t.sr_type] >= 0.1)
   const by = SORTS.find(([k]) => k === sort)[2]
-  const rows = [...types].sort((a, b) => by(b) - by(a)).slice(0, 20)
-  const maxN = Math.max(...rows.map((t) => t.n))
+  const sorted = [...services].sort((a, b) => by(b) - by(a)).slice(0, 20)
+  const rows = all ? sorted : sorted.slice(0, 10)
+  const max = Math.max(...sorted.map(by), 0) || 1
+  const pick = (id) => { location.hash = id ? `#service-tracker/${id}` : '#service-tracker' }
+
   return (
     <>
+      <label className="search">Neighborhood
+        <select value={area?.id ?? ''} onChange={(e) => pick(e.target.value)}>
+          <option value="">All of Chicago</option>
+          {[...areas].sort((a, b) => a.name.localeCompare(b.name)).map((a) => <option key={a.id} value={a.id}>{title(a.name)}</option>)}
+        </select>
+        {area && <a href={`#neighborhood/${area.id}`}>Full report →</a>}
+      </label>
+      {areaId && !area && <p className="muted">We couldn't find that neighborhood. Showing all of Chicago.</p>}
+      {services.length > 0 && <p className="summary">{summary(services, cityDays, name, avgDays)}</p>}
       <div className="kpis">
         <Kpi label="Requests" value={fmt(total)} />
         <Kpi label="Still open" value={fmt(open)} note={pct(open / total)} />
-        <Kpi label="Avg days to close" value={fmt(avgDays, 1)} />
+        <Kpi label="Avg days to close" value={fmt(avgDays, 1)} note={area ? `City: ${fmt(cityAvg, 1)}` : null} />
       </div>
       <div className="list-head">
-        <h2>Top 20 services</h2>
+        <h2>Top services{name ? ` in ${name}` : ''}</h2>
         <div className="seg" role="group" aria-label="Sort services">
           {SORTS.map(([k, label]) => <button key={k} aria-pressed={sort === k} onClick={() => setSort(k)}>{label}</button>)}
         </div>
       </div>
-      <ol className="svc-list">
-        {rows.map((t) => {
-          const slow = t.days != null && t.days > avgDays
+      <ol className={area ? 'svc-list in-area' : 'svc-list'}>
+        <li className="svc-cols" aria-hidden="true"><span /><span>Service</span><span /><span>Requests</span><span>Open</span><span>{area ? 'Days (vs city)' : 'Days'}</span></li>
+        {rows.map((t, i) => {
+          const diff = area && t.days != null && cityDays[t.sr_type] != null ? t.days - cityDays[t.sr_type] : null
+          // In a neighborhood, "slow" means slower than the city for the same service.
+          const slow = area ? diff != null && diff >= 0.5 : t.days != null && t.days > avgDays
           return (
             <li key={t.sr_type}>
-              <div className="svc-head"><b>{t.sr_type}</b><span className="muted">{fmt(t.n)} requests</span></div>
-              <div className="meter" role="img" aria-label={`${fmt(t.n)} requests`}><span style={{ width: `${(t.n / maxN) * 100}%` }} /></div>
-              <div className="svc-stats">
-                <span className="chip">{pct(t.open / t.n)} still open</span>
-                <span className={slow ? 'chip slow' : 'chip fast'}>{t.days == null ? 'No close time' : `${fmt(t.days, 1)} days to close`}</span>
-              </div>
+              <span className="rank">{i + 1}</span>
+              <b>{t.sr_type}</b>
+              <span className="meter" aria-hidden="true"><span style={{ width: `${(Math.max(by(t), 0) / max) * 100}%` }} /></span>
+              <span>{fmt(t.n)}<span className="lbl"> requests</span></span>
+              <span><span className="lbl">Open </span>{pct(t.open / t.n)}</span>
+              <span className={slow ? 'days slow' : 'days'}>
+                {t.days == null ? '–' : fmt(t.days, 1)}<span className="lbl"> days</span>
+                {diff != null && Math.abs(diff) >= 0.1 && <span className="diff" title="Compared with the city average for this service"> ({signed(diff)})</span>}
+              </span>
             </li>
           )
         })}
       </ol>
+      {!rows.length && <p className="muted">No requests here in the last {DAYS} days.</p>}
+      {sorted.length > 10 && (
+        <button className="btn more" onClick={() => setAll((v) => !v)}>{all ? 'Show top 10' : `Show all ${sorted.length}`}</button>
+      )}
+      <section className="act">
+        <p>See a problem{name ? ` in ${name}` : ''}? A 311 request puts it on the record.</p>
+        <a className="btn" href={CITY_311_URL} target="_blank" rel="noopener noreferrer">Report it to 311 →</a>
+      </section>
+      <Comments topic={`services/${area?.id ?? 'city'}`}
+        question={name ? `Do these numbers match what you see in ${name}?` : 'Do these numbers match what you see?'} />
     </>
   )
 }
@@ -193,18 +259,20 @@ function Ratings({ types }) {
   )
 }
 
-const AREA_COLS = [['name', 'Neighborhood'], ['score', 'Grade'], ['openShare', 'Open'], ['days', 'Avg days'],
-  ['clinicKm', 'Nearest clinic'], ['perK', 'Requests / 1k residents']]
+const AREA_SORTS = [
+  ['best', 'Best first', (a, b) => b.score - a.score],
+  ['worst', 'Worst first', (a, b) => a.score - b.score],
+  ['az', 'A to Z', (a, b) => a.name.localeCompare(b.name)],
+]
 
+// One clickable card per neighborhood; each opens that neighborhood's report.
 function Scorecard({ areas }) {
   const [q, setQ] = useState('')
-  const [sort, setSort] = useState({ key: 'score', dir: -1 })
-  const shown = areas.filter((a) => a.name.includes(q.trim().toUpperCase())).sort((a, b) => {
-    const [x, y] = [a[sort.key], b[sort.key]]
-    if (x == null || y == null) return (x == null) - (y == null) // missing values always last
-    return (x < y ? -1 : x > y ? 1 : 0) * sort.dir
-  })
-  const sortBy = (key) => setSort((s) => ({ key, dir: s.key === key ? -s.dir : key === 'score' ? -1 : 1 }))
+  const [sort, setSort] = useState('best')
+  const [all, setAll] = useState(false)
+  const needle = q.trim().toUpperCase()
+  const matches = areas.filter((a) => a.name.includes(needle)).sort(AREA_SORTS.find(([k]) => k === sort)[2])
+  const shown = all || needle ? matches : matches.slice(0, 12)
   return (
     <>
       <p className="muted">Graded on 311 backlog, close time and clinic distance. Grades rate city service, not the neighborhood.</p>
@@ -216,41 +284,56 @@ function Scorecard({ areas }) {
           <li>Clinic distance is a straight line to the nearest of 24 city clinics.</li>
         </ul>
       </details>
-      <label className="search">Filter <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Englewood" /></label>
-      <table>
-        <thead>
-          <tr>
-            {AREA_COLS.map(([key, label]) => (
-              <th key={key} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
-                <button className="sort" onClick={() => sortBy(key)}>
-                  {label}<span aria-hidden="true">{sort.key === key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}</span>
-                </button>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {!shown.length && <tr><td colSpan={AREA_COLS.length} className="muted">No neighborhood matches "{q}".</td></tr>}
-          {shown.map((a) => (
-            <tr key={a.id}>
-              <td><a href={`#neighborhood/${a.id}`}>{title(a.name)}</a></td>
-              <td><span className={`grade g${a.grade}`}>{a.grade}</span></td>
-              <td>{pct(a.openShare)}</td><td>{fmt(a.days, 1)}</td>
-              <td>{fmt(a.clinicKm, 1)} km</td><td>{fmt(a.perK)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="list-head">
+        <label className="search">Filter <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Englewood" /></label>
+        <div className="seg" role="group" aria-label="Sort neighborhoods">
+          {AREA_SORTS.map(([k, label]) => <button key={k} aria-pressed={sort === k} onClick={() => setSort(k)}>{label}</button>)}
+        </div>
+      </div>
+      {!shown.length && <p className="muted">No neighborhood matches "{q}".</p>}
+      <ul className="cards area-cards">
+        {shown.map((a) => (
+          <li key={a.id}>
+            <a className="card" href={`#neighborhood/${a.id}`}>
+              <div className="area-head"><b>{title(a.name)}</b><span className={`grade g${a.grade}`} aria-label={`Grade ${a.grade}`}>{a.grade}</span></div>
+              <dl>
+                <div><dt>Open</dt><dd>{pct(a.openShare)}</dd></div>
+                <div><dt>Avg days</dt><dd>{fmt(a.days, 1)}</dd></div>
+                <div><dt>Clinic</dt><dd>{fmt(a.clinicKm, 1)} km</dd></div>
+              </dl>
+            </a>
+          </li>
+        ))}
+      </ul>
+      {!needle && matches.length > 12 && (
+        <button className="btn more" onClick={() => setAll((v) => !v)}>{all ? 'Show fewer' : `Show all ${matches.length}`}</button>
+      )}
     </>
   )
 }
 
+// Plain words for an area's wait index (1 = city average for the same requests).
+const vsAvg = (i) => (Math.abs(i - 1) < 0.03 ? 'about average' : `${pct(Math.abs(i - 1))} ${i > 1 ? 'longer' : 'shorter'}`)
+// Full phrase: "8% shorter than average" / "about the same as average".
+const vsAvgFull = (i) => (Math.abs(i - 1) < 0.03 ? 'about the same as average' : `${vsAvg(i)} than average`)
+const dayWord = (d) => `${fmt(d, 1)} ${fmt(d, 1) === '1' ? 'day' : 'days'}`
+
+// Who waits longer, told as a story: the answer, a plain comparison, examples, your neighborhood, the proof.
 function Fairness({ data, areas, e }) {
+  const [all, setAll] = useState(false)
+  const [pick, setPick] = useState('')
   const names = Object.fromEntries(areas.map((a) => [a.id, title(a.name)]))
   const gap = e.poor / e.rich - 1
-  const top = e.services[0]
+  const k = Math.max(1, Math.floor(e.areas.length / 5)) // same group size as equity()
   // The live number moves day to day, so the headline always says which 90 days it covers.
   const asOf = new Date(data.savedAt ?? Date.now()).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+  const per10 = 10 * (e.poor / e.rich)
+  const shown = all ? e.services : e.services.slice(0, 5)
+  const maxDays = Math.max(...shown.map((x) => Math.max(x.poor, x.rich)))
+  const byWait = [...e.areas].sort((a, b) => b.index - a.index)
+  const mine = pick && e.areas.find((a) => a.id === pick)
+  const rank = mine && byWait.findIndex((a) => a.id === pick) + 1
+
   return (
     <>
       <p className="headline">
@@ -259,44 +342,61 @@ function Fairness({ data, areas, e }) {
           : <>The same type of 311 request takes about as long to close in poor neighborhoods as in rich ones.</>}
       </p>
       <p className="muted">90 days ending {asOf}.</p>
-      {top && top.poor > top.rich * 1.5 && (
-        <p className="muted">Biggest gap: {top.type}, {fmt(top.rich, 1)} days in the richest areas vs {fmt(top.poor, 1)} in the poorest.</p>
+
+      <div className="compare" role="img" aria-label={`For every 10 days a richer neighborhood waits, a poorer one waits ${fmt(per10, 1)}.`}>
+        <p>For every <strong>10 days</strong> a richer neighborhood waits, a poorer one waits <strong>{fmt(per10, 1)}</strong>.</p>
+        <div className="pair"><span>{k} richest</span><span className="bar2"><span style={{ width: `${(10 / Math.max(10, per10)) * 100}%` }} /></span><b>10 days</b></div>
+        <div className="pair poor"><span>{k} poorest</span><span className="bar2"><span style={{ width: `${(per10 / Math.max(10, per10)) * 100}%` }} /></span><b>{fmt(per10, 1)} days</b></div>
+      </div>
+
+      <h2>Where the gap is biggest</h2>
+      <ul className="gaps">
+        {shown.map((x) => (
+          <li key={x.type}>
+            <b>{x.type}</b>
+            <div className="pair"><span>Richest</span><span className="bar2"><span style={{ width: `${(x.rich / maxDays) * 100}%` }} /></span><span>{dayWord(x.rich)}</span></div>
+            <div className="pair poor"><span>Poorest</span><span className="bar2"><span style={{ width: `${(x.poor / maxDays) * 100}%` }} /></span><span>{dayWord(x.poor)}</span></div>
+          </li>
+        ))}
+      </ul>
+      {e.services.length > 5 && (
+        <button className="btn more" onClick={() => setAll((v) => !v)}>{all ? 'Show top 5' : `Show all ${e.services.length}`}</button>
       )}
-      <h2>Lower income, longer wait</h2>
-      <p className="muted">Each dot is a neighborhood.</p>
-      <Scatter points={e.areas.map((a) => ({ ...a, name: names[a.id] }))} rich={e.rich} poor={e.poor} />
+
+      <h2>Check your neighborhood</h2>
+      <label className="search">Neighborhood
+        <select value={pick} onChange={(ev) => setPick(ev.target.value)}>
+          <option value="">Pick one</option>
+          {[...e.areas].sort((a, b) => names[a.id].localeCompare(names[b.id])).map((a) => <option key={a.id} value={a.id}>{names[a.id]}</option>)}
+        </select>
+      </label>
+      {mine && (
+        <p className="summary">
+          {names[mine.id]}'s waits are <strong>{vsAvgFull(mine.index)}</strong> for the same requests.
+          It ranks <strong>#{rank}</strong> of {e.areas.length} for longest waits, and {pct(mine.low)} of its households earn under $25k.
+          {' '}<a href={`#service-tracker/${mine.id}`}>See its services →</a>
+        </p>
+      )}
+
+      <h2>Every neighborhood</h2>
+      <p className="muted">Each dot is a neighborhood. Higher means a longer wait.</p>
+      <Scatter points={e.areas.map((a) => ({ ...a, name: names[a.id] }))} rich={e.rich} poor={e.poor} k={k} />
       <details className="method">
         <summary>See as a table</summary>
         <table>
           <thead><tr><th>Neighborhood</th><th>Wait vs city average</th><th>Households under $25k</th></tr></thead>
           <tbody>
-            {[...e.areas].sort((a, b) => b.index - a.index).map((a) => (
-              <tr key={a.id}><td>{names[a.id]}</td><td>{fmt(a.index, 2)}×</td><td>{pct(a.low)}</td></tr>
+            {byWait.map((a) => (
+              <tr key={a.id}><td>{names[a.id]}</td><td>{vsAvg(a.index)}</td><td>{pct(a.low)}</td></tr>
             ))}
           </tbody>
         </table>
       </details>
-      <h2>By service</h2>
-      <table>
-        <thead><tr><th>Service</th><th>Richest fifth</th><th>Poorest fifth</th><th>Gap</th></tr></thead>
-        <tbody>
-          {e.services.map((s) => (
-            <tr key={s.type}>
-              <td>{s.type}</td><td>{fmt(s.rich, 1)} days</td><td>{fmt(s.poor, 1)} days</td>
-              <td>{fmt(s.poor / s.rich, 1)}×</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <h2>In 3D</h2>
-      <p className="muted">Taller is a longer wait. Gold is faster than average, rose is slower.</p>
-      <video className="skyline" src="./skyline_loop.mp4" poster="./skyline.png" controls loop muted autoPlay playsInline
-        aria-label="Spinning 3D model of Chicago neighborhoods raised by wait time" />
       <details className="method">
         <summary>How it's measured</summary>
         <ul>
-          <li>Each area is compared with the city average for its own mix of requests. Same-day services are left out.</li>
-          <li>Richest and poorest fifth: smallest and largest share of households under $25k (Census).</li>
+          <li>Each neighborhood is compared with the city average for its own mix of requests. Same-day services are left out.</li>
+          <li>Richest and poorest: the {k} neighborhoods with the smallest and largest share of households under $25k (Census).</li>
           <li>Closed tickets only, last {DAYS} days. Shows income and wait go together, not why.</li>
         </ul>
       </details>
@@ -305,37 +405,37 @@ function Fairness({ data, areas, e }) {
   )
 }
 
-function Scatter({ points, rich, poor }) {
-  const W = 640, H = 320, L = 52, R = 24, T = 20, B = 44
+function Scatter({ points, rich, poor, k }) {
+  const W = 640, H = 320, L = 64, R = 24, T = 24, B = 44
   const xs = points.map((p) => p.low), ys = points.map((p) => p.index)
   const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
   const x = (v) => L + ((v - minX) / (maxX - minX)) * (W - L - R)
   const y = (v) => H - B - ((v - minY) / (maxY - minY)) * (H - T - B)
-  // Same fifths as equity(): sorted by low-income share.
+  // Same groups as equity(): sorted by low-income share.
   const sorted = [...points].sort((a, b) => a.low - b.low)
-  const k = Math.max(1, Math.floor(sorted.length / 5))
-  const groups = [[sorted.slice(0, k), rich, 'richest fifth avg'], [sorted.slice(-k), poor, 'poorest fifth avg']]
+  const groups = [[sorted.slice(0, k), rich, `${k} richest`], [sorted.slice(-k), poor, `${k} poorest`]]
   const poorIds = new Set(sorted.slice(-k).map((p) => p.id))
   const byWait = [...points].sort((a, b) => b.index - a.index)
   const labeled = [byWait[0], byWait[1], byWait.at(-1)]
   const yTicks = [0.8, 1, 1.2, 1.4].filter((t) => t >= minY && t <= maxY)
+  const tick = (t) => (t === 1 ? 'average' : `${t > 1 ? '+' : '−'}${pct(Math.abs(t - 1))}`)
   return (
     <div className="scatter-wrap">
       <svg viewBox={`0 0 ${W} ${H}`} className="scatter" role="img"
-        aria-label={`Scatter plot of ${points.length} neighborhoods. The poorest fifth averages ${fmt(poor, 2)} times the city average wait; the richest fifth averages ${fmt(rich, 2)}. The table below lists every neighborhood.`}>
+        aria-label={`Chart of ${points.length} neighborhoods. The ${k} poorest have waits ${vsAvgFull(poor)}; the ${k} richest, ${vsAvgFull(rich)}. The table below lists every neighborhood.`}>
         {/* Range-frame axes: lines span only the data. */}
         <line x1={x(minX)} x2={x(maxX)} y1={H - B + 8} y2={H - B + 8} className="axis" />
         <line x1={L - 8} x2={L - 8} y1={y(minY)} y2={y(maxY)} className="axis" />
         {[0.1, 0.2, 0.3, 0.4, 0.5].filter((t) => t >= minX && t <= maxX).map((t) => (
           <text key={t} x={x(t)} y={H - B + 24} textAnchor="middle">{pct(t)}</text>
         ))}
-        {yTicks.map((t) => <text key={t} x={L - 14} y={y(t) + 4} textAnchor="end">{fmt(t, 1)}×</text>)}
-        <text x={W - R} y={H - 6} textAnchor="end">households under $25k →</text>
+        {yTicks.map((t) => <text key={t} x={L - 14} y={y(t) + 4} textAnchor="end">{tick(t)}</text>)}
+        <text x={L - 8} y={12} textAnchor="start">↑ Waits longer</text>
+        <text x={W - R} y={H - 6} textAnchor="end">More low-income households →</text>
         <line x1={x(minX)} x2={x(maxX)} y1={y(1)} y2={y(1)} className="ref" />
-        <text x={x(maxX)} y={y(1) + 16} textAnchor="end">city average</text>
         {points.map((p) => (
           <circle key={p.id} cx={x(p.low)} cy={y(p.index)} r="4.5" className={poorIds.has(p.id) ? 'hi' : undefined}>
-            <title>{`${p.name}: ${fmt(p.index, 2)}× city average, ${pct(p.low)} of households under $25k`}</title>
+            <title>{`${p.name}: waits ${vsAvgFull(p.index)}; ${pct(p.low)} of households under $25k`}</title>
           </circle>
         ))}
         {groups.map(([g, avg, label]) => {
@@ -343,7 +443,7 @@ function Scatter({ points, rich, poor }) {
           return (
             <g key={label} className="avg">
               <line x1={x1} x2={x2} y1={y(avg)} y2={y(avg)} />
-              <text x={(x1 + x2) / 2} y={y(avg) + (avg > 1 ? -8 : 16)} textAnchor="middle">{label} {fmt(avg, 2)}×</text>
+              <text x={(x1 + x2) / 2} y={y(avg) + (avg > 1 ? -8 : 16)} textAnchor="middle">{label}: {vsAvg(avg)}</text>
             </g>
           )
         })}

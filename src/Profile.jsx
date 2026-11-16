@@ -63,7 +63,7 @@ export default function Profile({ id, areas, eq, clinics, centers }) {
 
       <Comments topic={`neighborhood/${id}`} question={`Is this grade fair for ${name}?`} />
       <Voice name={name} />
-      <p><a href="#health-access-map">See the health access map →</a> · <a href="#neighborhood-scorecard">All neighborhoods →</a></p>
+      <p><a href={`#service-tracker/${id}`}>See its 311 services →</a> · <a href="#health-access-map">See the health access map →</a> · <a href="#neighborhood-scorecard">All neighborhoods →</a></p>
     </>
   )
 }

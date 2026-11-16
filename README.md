@@ -1,4 +1,4 @@
-# Chicago City Scorecard
+# Pulse
 
 How well is Chicago serving its residents? Built from 311 requests, census income data, city clinic locations and federally funded community health centers.
 
