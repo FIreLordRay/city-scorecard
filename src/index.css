@@ -314,13 +314,14 @@ a { color: var(--accent); }
 .citymap figcaption span { display: inline-flex; align-items: center; gap: 4px; }
 .citymap figcaption i { width: 12px; height: 12px; border-radius: 3px; }
 
-/* Landing: map beside the headline on wide screens, above it on phones. */
-.landing-hero { display: grid; grid-template-columns: 1fr; }
-.hero-map { max-width: 220px; justify-self: center; margin-bottom: 8px; }
+/* Landing: on wide screens the map gets its own column beside the headline AND the question cards, so the
+   tall map never leaves a gap under the search box. On phones it sits above the headline. */
+.landing { display: grid; grid-template-columns: minmax(0, 1fr); }
+.hero-map { width: 100%; max-width: 220px; justify-self: center; margin: 16px 0 0; }
 @media (min-width: 980px) {
-  .landing-hero { grid-template-columns: 1fr 300px; column-gap: 32px; align-items: center; }
-  .landing-hero > :not(.hero-map) { grid-column: 1; }
-  .hero-map { grid-column: 2; grid-row: 1 / span 6; max-width: 300px; }
+  .landing { grid-template-columns: minmax(0, 1fr) 300px; column-gap: 32px; }
+  .landing > * { grid-column: 1; }
+  .landing > .hero-map { grid-column: 2; grid-row: 1 / span 4; align-self: start; position: sticky; top: 24px; max-width: 300px; margin-top: 32px; }
 }
 
 /* Report hero: small "you are here" map on the right. */

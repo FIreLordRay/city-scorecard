@@ -30,9 +30,9 @@ export default function Landing({ areas, onFound }) {
   }
 
   return (
-    <>
+    <div className="landing">
+      {areas && <CityMap areas={areas} legend className="hero-map" />}
       <section className="landing-hero">
-        {areas && <CityMap areas={areas} legend className="hero-map" />}
         <h1>One city. Different people. Same Pulse?</h1>
         <p className="lede">How well is Chicago serving your neighborhood? Look it up, or pick a question.</p>
         <div className="landing-search">
@@ -57,6 +57,6 @@ export default function Landing({ areas, onFound }) {
         ))}
       </ul>
       <p className="muted small">Grades rate the city's service, not the people who live there.</p>
-    </>
+    </div>
   )
 }
