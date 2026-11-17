@@ -30,9 +30,9 @@ export default function Profile({ id, areas, eq, clinics, centers, wards, point 
 
   async function share() {
     const url = `${location.origin}${location.pathname}#neighborhood/${id}`
-    const text = `${name} gets a ${a.grade} on the Chicago City Scorecard.`
+    const text = `${name} gets a ${a.grade} on Pulse, Chicago's city service scorecard.`
     try {
-      if (navigator.share) await navigator.share({ title: 'Chicago City Scorecard', text, url })
+      if (navigator.share) await navigator.share({ title: 'Pulse', text, url })
       else { await navigator.clipboard.writeText(url); setShared('Link copied. It names the neighborhood, not your address.') }
     } catch { /* closing the share sheet is not an error */ }
   }
