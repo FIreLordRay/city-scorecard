@@ -39,6 +39,7 @@ export default function App() {
   const [centers, setCenters] = useState([])
   const [wards, setWards] = useState([])
   const [extras, setExtras] = useState(null)
+  const [groceries, setGroceries] = useState(null)
   // The address someone looked up, as a map point, kept in memory only (never in the URL).
   const [here, setHere] = useState(null)
 
@@ -59,6 +60,8 @@ export default function App() {
     fetch('./wards.json').then((r) => (r.ok ? r.json() : null)).then((w) => w && setWards(w.list), () => {})
     // Saved by `npm run snapshot`; without it the report skips the safety, transit, housing and food section.
     fetch('./extras.json').then((r) => (r.ok ? r.json() : null)).then((x) => x && setExtras(x), () => {})
+    // Saved by `npm run snapshot`; without it the report skips the groceries card.
+    fetch('./groceries.json').then((r) => (r.ok ? r.json() : null)).then((g) => g && setGroceries(g), () => {})
   }, [])
   const areas = useMemo(() => data && scoreAreas(data), [data])
   const eq = useMemo(() => data && equity(data.byAreaType, data.lowIncome), [data])
@@ -104,7 +107,7 @@ export default function App() {
         {data && tab === 3 && <HealthMap areas={areas} clinics={data.clinics} centers={centers} />}
         {data && tab === 4 && <Fairness data={data} areas={areas} e={eq} />}
         {data && pid && <Profile id={pid} areas={areas} eq={eq} clinics={data.clinics} centers={centers} wards={wards}
-          point={here?.areaId === pid ? here.point : null} extras={extras} pop={data.pop?.[areas.find((x) => x.id === pid)?.name]} />}
+          point={here?.areaId === pid ? here.point : null} extras={extras} groceries={groceries} pop={data.pop?.[areas.find((x) => x.id === pid)?.name]} />}
         </main>
       </div>
     </div>

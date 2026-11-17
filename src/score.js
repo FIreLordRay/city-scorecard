@@ -119,3 +119,6 @@ export function contains(geometry, [x, y]) {
   }
   return inside
 }
+
+// USDA SNAP store types that sell a full range of groceries, as opposed to corner, specialty or restaurant.
+export const FULL_GROCERY = new Set(['Supermarket', 'Super Store', 'Grocery Store', 'Farmers and Markets'])

@@ -16,7 +16,7 @@ const MEASURES = [
 ]
 
 // `point` ([lng, lat]) is set only when someone typed an address; it never goes in the URL.
-export default function Profile({ id, areas, eq, clinics, centers, wards, point, extras, pop }) {
+export default function Profile({ id, areas, eq, clinics, centers, wards, point, extras, groceries, pop }) {
   const [shared, setShared] = useState('')
   const rank = areas.findIndex((a) => a.id === id)
   if (rank < 0) {
@@ -99,7 +99,7 @@ export default function Profile({ id, areas, eq, clinics, centers, wards, point,
         ))}
       </ol>
 
-      {extras && <MoreAbout area={a} name={name} pop={pop} extras={extras} from={point && [point[1], point[0]]} />}
+      {extras && <MoreAbout area={a} name={name} pop={pop} extras={extras} groceries={groceries} from={point && [point[1], point[0]]} />}
 
       <Comments topic={`neighborhood/${id}`} question={`Is this grade fair for ${name}?`} />
       <Voice name={name} />

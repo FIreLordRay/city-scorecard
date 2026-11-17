@@ -1,12 +1,15 @@
-import { ShieldCheck, TrainFront, Building2, Utensils } from 'lucide-react'
-import { centroid, km, fmt, pct } from './score.js'
+import { ShieldCheck, TrainFront, Building2, Utensils, ShoppingBasket } from 'lucide-react'
+import { centroid, km, fmt, pct, FULL_GROCERY } from './score.js'
+import { directions } from './HealthMap.jsx'
 
 const LINE_COLORS = { Red: '#c60c30', Blue: '#00a1de', Green: '#009b3a', Brown: '#62361b', Purple: '#522398', Yellow: '#f9e300', Pink: '#e27ea6', Orange: '#f9461c' }
+// Store names arrive in ALL CAPS; capitalize words without breaking "Lion's".
+const title = (s) => s.toLowerCase().replace(/(^|[\s-])\S/g, (c) => c.toUpperCase())
 const vs = (here, city) => (here > city ? 'above' : here < city ? 'below' : 'the same as')
 
 // Safety, transit, housing and food for one neighborhood, from public/extras.json (saved by `npm run snapshot`).
 // `from` is [lat, lng]: the typed address when there is one, otherwise the neighborhood center.
-export default function MoreAbout({ area, name, pop, extras, from }) {
+export default function MoreAbout({ area, name, pop, extras, groceries, from }) {
   const s = extras.areas[area.id]
   if (!s) return null
   const c = from ?? centroid(area.feature.geometry)
@@ -14,6 +17,10 @@ export default function MoreAbout({ area, name, pop, extras, from }) {
   const docks = extras.divvy.filter(([lat, lng]) => km(c, [lat, lng]) <= 0.5).length
   const arrest = s.crimes ? s.arrests / s.crimes : null
   const fail = s.inspections ? s.fails / s.inspections : null
+  const closest = (list) => list.reduce((best, p) => { const d = km(c, [p.lat, p.lng]); return d < (best?.d ?? Infinity) ? { ...p, d } : best }, null)
+  const g = groceries?.areas[area.id]
+  const shop = g && closest(groceries.grocery)
+  const ebt = g && closest(groceries.snap.filter((p) => FULL_GROCERY.has(p.type)))
   const perK = (n) => (pop ? fmt((n / pop) * 1000, 1) : null)
 
   return (
@@ -55,8 +62,16 @@ export default function MoreAbout({ area, name, pop, extras, from }) {
           </>}
           {s.inspections > 0 && s.inspections < 20 && <p className="muted small">Few inspections, so one result moves this a lot.</p>}
         </article>
+        {g && <article>
+          <h3><ShoppingBasket size={20} aria-hidden="true" /> Groceries</h3>
+          <p className="big">{fmt(g.grocery)}</p>
+          <p>grocery stores{perK(g.grocery) && ` (${perK(g.grocery)} per 1,000 residents)`}. {fmt(g.snap)} stores take SNAP (EBT), {fmt(g.snapGrocery)} of them grocery stores or supermarkets.</p>
+          {shop && <p>Nearest grocery: <b>{title(shop.name)}</b> <span className="muted">· {fmt(shop.d, 1)} km</span> <a href={directions(shop)} target="_blank" rel="noopener noreferrer">Directions →</a></p>}
+          {ebt && <p>Nearest that takes EBT: <b>{title(ebt.name)}</b> <span className="muted">· {fmt(ebt.d, 1)} km</span> <a href={directions(ebt)} target="_blank" rel="noopener noreferrer">Directions →</a></p>}
+        </article>}
       </div>
       <p className="muted small">Sources: Chicago Data Portal crimes, CTA 'L' stops, Divvy stations, building violations, affordable rental housing and food inspections. Saved {new Date(extras.savedAt).toLocaleDateString()}.</p>
+      {g && <p className="muted small">Grocery stores: city food inspections of stores open in the last two years. SNAP stores: USDA SNAP Retailer Locator, updated {new Date(groceries.snapUpdated).toLocaleDateString()}.</p>}
     </section>
   )
 }
