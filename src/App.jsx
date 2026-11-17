@@ -27,6 +27,9 @@ export default function App() {
   const [tab, setTab] = useState(tabFromHash)
   const [pid, setPid] = useState(profileFromHash)
   const [centers, setCenters] = useState([])
+  const [wards, setWards] = useState([])
+  // The address someone looked up, as a map point, kept in memory only (never in the URL).
+  const [here, setHere] = useState(null)
 
   useEffect(() => {
     const onHash = () => { setTab(tabFromHash()); setPid(profileFromHash()); window.scrollTo(0, 0) }
@@ -41,6 +44,8 @@ export default function App() {
     loadAll().then((d) => { live = true; setData(d) }, (e) => setError(e.message))
     // Saved by `npm run snapshot` from HRSA; the map still works without it.
     fetch('./health-centers.json').then((r) => (r.ok ? r.json() : null)).then((h) => h && setCenters(h.list), () => {})
+    // Saved by `npm run snapshot`; without it the report just can't name a ward.
+    fetch('./wards.json').then((r) => (r.ok ? r.json() : null)).then((w) => w && setWards(w.list), () => {})
   }, [])
   const areas = useMemo(() => data && scoreAreas(data), [data])
   const eq = useMemo(() => data && equity(data.byAreaType, data.lowIncome), [data])
@@ -79,13 +84,14 @@ export default function App() {
         <main className="panel" aria-busy={!data && !error}>
         {error && !data && <p role="alert" className="error">Could not load city data: {error}</p>}
         {!data && !error && <p className="muted" role="status">Loading city data…</p>}
-        {tab === HOME && <Landing areas={areas} />}
+        {tab === HOME && <Landing areas={areas} onFound={setHere} />}
         {data && tab === 0 && <><Finding e={eq} /><Tracker types={data.types} /></>}
         {data && tab === 1 && <Ratings types={data.types} />}
         {data && tab === 2 && <Scorecard areas={areas} />}
         {data && tab === 3 && <HealthMap areas={areas} clinics={data.clinics} centers={centers} />}
         {data && tab === 4 && <Fairness data={data} areas={areas} e={eq} />}
-        {data && pid && <Profile id={pid} areas={areas} eq={eq} clinics={data.clinics} centers={centers} />}
+        {data && pid && <Profile id={pid} areas={areas} eq={eq} clinics={data.clinics} centers={centers} wards={wards}
+          point={here?.areaId === pid ? here.point : null} />}
         {tab === 5 && <Skyline />}
         </main>
       </div>

@@ -2,6 +2,8 @@
 
 How well is Chicago serving its residents? Built from 311 requests, census income data, city clinic locations and federally funded community health centers.
 
+- **Home:** find your neighborhood by name, or type your address to also get your ward and alderman and the free clinics closest to your door
+- **Neighborhood reports** (`#neighborhood/<id>`): overall grade, a grade per measure, how long requests wait vs the city average, your ward, nearest care, and a share button. Shared links name the neighborhood, never the address.
 - **Service tracker:** requests, backlog and close times for the last 90 days, with the headline finding up top
 - **Service ratings:** each service ranked on speed and backlog (computed from 311 records, not votes)
 - **Neighborhood scorecard:** all 77 community areas graded A to F, sortable and searchable
@@ -32,6 +34,8 @@ npm run preview
 | Chicago Data Portal: community area boundaries | map shapes, neighborhood names |
 | Chicago Data Portal: ACS 5-year by community area | population, share of households under $25k |
 | Chicago Data Portal: CDPH clinic locations | city clinics (24) |
+| Chicago Data Portal: ward boundaries (2023) and ward offices | your ward and alderman |
+| OpenStreetMap Nominatim | turning a typed address into a map point |
 | HRSA: health center service delivery sites | community health centers |
 
 The app shows saved data first, then swaps in live portal data when it arrives (the portal can take a minute; the app gives up after 90 seconds and keeps the saved data). Refresh the saved data before a demo:
