@@ -84,7 +84,7 @@ export default function App() {
       <div className="content">
         {tab !== HOME && <header className="topbar">
           <div>
-            <h1>{pid ? (areas ? title(areas.find((a) => a.id === pid)?.name ?? 'Neighborhood') : 'Neighborhood') : TABS[tab]}</h1>
+            <h1>{pid ? 'Neighborhood report' : TABS[tab]}</h1>
             <p className="muted">Last {DAYS} days of 311 data.</p>
           </div>
           {areas && <NeighborhoodSearch areas={areas} />}

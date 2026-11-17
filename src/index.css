@@ -267,16 +267,9 @@ a { color: var(--accent); }
 .gaps li { display: grid; gap: 6px; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
 @media (max-width: 640px) { .pair { grid-template-columns: 5em 1fr 4.6em; gap: 8px; } .gaps { grid-template-columns: 1fr; } }
 .pair > :last-child { white-space: nowrap; }
-/* Address lookup on the landing page, plus ward, wait meter and share on the neighborhood report. */
-.lookup { display: grid; gap: 8px; max-width: 640px; margin-top: 16px; }
-.lookup > label { font-weight: 700; }
-.lookup-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.lookup-row input { flex: 1 1 260px; min-height: 44px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--bg); color: var(--text); font: inherit; }
-.lookup-row button, .share { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: var(--accent);
-  color: var(--bg); font: inherit; font-weight: 700; cursor: pointer; }
-.lookup-row button:disabled { opacity: 0.7; cursor: progress; }
-.share { margin-top: 8px; }
+/* Ward, wait meter and share on the neighborhood report. */
+.share { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: var(--accent);
+  color: var(--bg); font: inherit; font-weight: 700; cursor: pointer; margin-top: 8px; }
 .small-note { font-size: 0.85rem; }
 .note { margin: 4px 0 0; color: var(--accent); }
 .wait { margin: 20px 0; padding: 16px 18px; border-radius: 12px; border: 1px solid var(--accent-dark); background: var(--accent-soft); }
@@ -307,3 +300,34 @@ a { color: var(--accent); }
 .more-grid p { margin: 4px 0; }
 .more-grid .big { font-size: 1.6rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
 .line { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 4px; color: #fff; font-size: 0.75rem; font-weight: 700; }
+
+/* Grade map: the 77 neighborhoods drawn from their boundaries, on the landing page and each report. */
+.citymap { margin: 0; }
+.citymap svg { display: block; width: 100%; height: auto; }
+.citymap path { vector-effect: non-scaling-stroke; stroke: var(--bg); stroke-width: 0.75; stroke-linejoin: round; transition: opacity 150ms ease; }
+.citymap a:hover path { stroke: var(--text); stroke-width: 1.5; }
+.fillA { fill: #f3db91; background: #f3db91; } .fillB { fill: #d7b27f; background: #d7b27f; } .fillC { fill: #bf8e70; background: #bf8e70; }
+.fillD { fill: #8c5446; background: #8c5446; } .fillF { fill: #6a3a30; background: #6a3a30; }
+.citymap path.dim { fill: #6b7540; }
+.citymap path.here { fill: var(--accent); stroke: var(--text); stroke-width: 1.5; }
+.citymap figcaption { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; margin-top: 8px; font-size: 0.8rem; }
+.citymap figcaption span { display: inline-flex; align-items: center; gap: 4px; }
+.citymap figcaption i { width: 12px; height: 12px; border-radius: 3px; }
+
+/* Landing: map beside the headline on wide screens, above it on phones. */
+.landing-hero { display: grid; grid-template-columns: 1fr; }
+.hero-map { max-width: 220px; justify-self: center; margin-bottom: 8px; }
+@media (min-width: 980px) {
+  .landing-hero { grid-template-columns: 1fr 300px; column-gap: 32px; align-items: center; }
+  .landing-hero > :not(.hero-map) { grid-column: 1; }
+  .hero-map { grid-column: 2; grid-row: 1 / span 6; max-width: 300px; }
+}
+
+/* Report hero: small "you are here" map on the right. */
+.hero { position: relative; }
+.hero > div { flex: 1; min-width: 0; }
+.here-map { flex: none; width: 120px; }
+@media (max-width: 520px) { .here-map { position: absolute; top: 20px; right: 20px; width: 72px; } }
+
+/* One frame is enough: drop the box around the whole page so the cards inside read as the content. */
+.panel { background: none; border: 0; padding: 0; }

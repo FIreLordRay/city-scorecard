@@ -1,8 +1,10 @@
 import { ArrowRight, ClipboardList, Star, LayoutGrid, MapPin, Scale } from 'lucide-react'
 import NeighborhoodSearch from './NeighborhoodSearch.jsx'
-import AddressSearch from './AddressSearch.jsx'
+import { useState } from 'react'
+import { lookupAddress } from './AddressSearch.jsx'
+import CityMap from './CityMap.jsx'
 
-// The front door. It shows no numbers: everything here is a way to ask for the data you want.
+// The front door: a map of every neighborhood's grade, a search box, and doors to each question.
 const DOORS = [
   [MapPin, 'Find free or low-cost care', 'Clinics, hours and directions.', '#health-access-map'],
   [ClipboardList, 'How fast does 311 respond?', 'Requests and close times.', '#service-tracker'],
@@ -12,17 +14,34 @@ const DOORS = [
 ]
 
 export default function Landing({ areas, onFound }) {
+  const [msg, setMsg] = useState('')
+
+  async function findAddress(text) {
+    setMsg('Finding that address…')
+    try {
+      const hit = await lookupAddress(areas, text)
+      if (!hit) return setMsg("Couldn't find that address in Chicago. Try adding the street type (Ave, St), or type a neighborhood name.")
+      setMsg('')
+      onFound({ areaId: hit.area.id, point: hit.point })
+      location.hash = `#neighborhood/${hit.area.id}`
+    } catch {
+      setMsg("Address search isn't reachable right now. Type a neighborhood name instead.")
+    }
+  }
+
   return (
     <>
       <section className="landing-hero">
+        {areas && <CityMap areas={areas} legend className="hero-map" />}
         <h1>One city. Different people. Same Pulse?</h1>
         <p className="lede">How well is Chicago serving your neighborhood? Look it up, or pick a question.</p>
         <div className="landing-search">
           {areas
-            ? <NeighborhoodSearch areas={areas} large />
+            ? <NeighborhoodSearch areas={areas} large onAddress={findAddress} placeholder="Neighborhood or address" />
             : <input type="search" disabled aria-label="Find a neighborhood" placeholder="Loading neighborhoods…" />}
         </div>
-        {areas && <AddressSearch areas={areas} onFound={onFound} />}
+        {msg && <p role="status" className="note">{msg}</p>}
+        <p className="muted small-note">An address also shows your ward and the care closest to your door. It goes to OpenStreetMap's search to find it on the map, isn't saved, and shared links only name the neighborhood.</p>
       </section>
       <h2 className="visually-hidden">Or start with a question</h2>
       <ul className="doors">

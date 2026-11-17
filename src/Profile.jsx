@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { title, fmt, pct, pctRank, gradeOf, contains } from './score.js'
 import Comments from './Comments.jsx'
 import MoreAbout from './MoreAbout.jsx'
+import CityMap from './CityMap.jsx'
 import { buildPlaces, nearestPlaces, directions, KINDS, Voice } from './HealthMap.jsx'
 
 const METER = [0.6, 1.4]   // wait-index range the meter shows; 1.0 (city average) sits in the middle
@@ -48,6 +49,7 @@ export default function Profile({ id, areas, eq, clinics, centers, wards, point,
           <button className="share" onClick={share}>Share this report</button>
           {shared && <p role="status" className="note">{shared}</p>}
         </div>
+        <CityMap areas={areas} highlight={id} className="here-map" />
       </section>
 
       {wait && <WaitMeter index={wait.index} total={eq.areas.length} slowerThan={eq.areas.filter((x) => x.index < wait.index).length} />}

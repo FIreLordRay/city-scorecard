@@ -15,11 +15,14 @@ export const KINDS = { center: ['Community health center', '#5eead4'], city: ['C
 // Google Maps directions URL; with no origin it starts from the visitor's current location.
 export const directions = (p) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${p.address}, Chicago, IL ${p.zip}`.trim())}`
 
+// Some HRSA names arrive in ALL CAPS; title-case those so the list doesn't shout.
+const calm = (s) => (s && s === s.toUpperCase() ? title(s) : s)
+
 // One shape for both sources so the map popups, the list and the neighborhood report render the same way.
 export const buildPlaces = (centers, clinics) => [
-  ...centers.map((c) => ({ ...c, kind: 'center', detail: c.org, hours: c.hours && `${c.hours} hours a week` })),
+  ...centers.map((c) => ({ ...c, name: calm(c.name), kind: 'center', detail: c.org, hours: c.hours && `${c.hours} hours a week` })),
   ...clinics.map((c) => ({
-    kind: 'city', name: c.site_name, detail: c.clinic_type, address: c.street_address, zip: '',
+    kind: 'city', name: calm(c.site_name), detail: c.clinic_type, address: c.street_address, zip: '',
     phone: c.phone_1, hours: c.hours_of_operation, web: null, lat: c.lat, lng: c.lng,
   })),
 ]
