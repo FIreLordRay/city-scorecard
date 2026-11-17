@@ -8,7 +8,7 @@ const DOORS = [
   [ClipboardList, 'How fast does 311 respond?', 'Requests and close times.', '#service-tracker'],
   [LayoutGrid, 'Grade every neighborhood', 'All 77, from A to F.', '#neighborhood-scorecard'],
   [Scale, 'Does income change the wait?', 'Same request, different waits.', '#who-waits-longer'],
-  [Star, 'Rate the city services', 'Best to worst.', '#service-ratings'],
+  [Star, 'How each service rates', 'Stars from 311 speed and backlog, best to worst.', '#service-ratings'],
 ]
 
 export default function Landing({ areas, onFound }) {

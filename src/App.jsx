@@ -7,6 +7,7 @@ import Profile from './Profile.jsx'
 import Landing from './Landing.jsx'
 import NeighborhoodSearch from './NeighborhoodSearch.jsx'
 import Comments from './Comments.jsx'
+import { all as allRatings, add as addRating, average } from './ratings.js'
 import { CITY_311_URL } from './config.js'
 
 const TABS = ['Service tracker', 'Service ratings', 'Neighborhood scorecard', 'Health access map', 'Who waits longer']
@@ -233,9 +234,13 @@ const TIERS = { 5: 'Best rated', 4: 'Above average', 3: 'Middle of the pack', 2:
 
 function Ratings({ types }) {
   const rated = rateServices(types)
+  const [votes, setVotes] = useState({})
+  const [thanks, setThanks] = useState(null)
+  useEffect(() => { allRatings().then(setVotes) }, [])
+  const rate = async (type, n) => { setVotes(await addRating(type, n)); setThanks(type) }
   return (
     <>
-      <p className="muted">Rated on speed and backlog from 311 records, not votes.</p>
+      <p className="muted">The tier stars come from 311 speed and backlog. Under each service, add your own rating from 1 to 5. Resident ratings are saved on this device.</p>
       {[5, 4, 3, 2, 1].map((n) => {
         const group = rated.filter((t) => t.stars === n)
         if (!group.length) return null
@@ -255,6 +260,7 @@ function Ratings({ types }) {
                     <div><dt>Avg days</dt><dd>{fmt(t.days, 1)}</dd></div>
                     <div><dt>Requests</dt><dd>{fmt(t.n)}</dd></div>
                   </dl>
+                  <ResidentRating type={t.sr_type} votes={votes[t.sr_type]} onRate={rate} thanked={thanks === t.sr_type} />
                 </div>
               ))}
             </div>
@@ -262,6 +268,24 @@ function Ratings({ types }) {
         )
       })}
     </>
+  )
+}
+
+// Five tap targets; the line below shows the residents' average so far.
+function ResidentRating({ type, votes = [], onRate, thanked }) {
+  const avg = average(votes)
+  return (
+    <div className="rate">
+      <div className="rate-stars" role="group" aria-label={`Your rating for ${type}`}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" onClick={() => onRate(type, n)} aria-label={`${n} star${n > 1 ? 's' : ''}`}>★</button>
+        ))}
+      </div>
+      <span className="muted small" role="status">
+        {thanked ? 'Thanks! ' : ''}
+        {avg == null ? 'No resident ratings yet' : `Residents: ${fmt(avg, 1)} ★ from ${votes.length} rating${votes.length > 1 ? 's' : ''}`}
+      </span>
+    </div>
   )
 }
 

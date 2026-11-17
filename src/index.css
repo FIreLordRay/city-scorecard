@@ -292,3 +292,10 @@ a { color: var(--accent); }
 .ward { display: flex; flex-direction: column; gap: 2px; margin: 0 0 8px; }
 .links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .links a { display: inline-flex; align-items: center; min-height: 44px; }
+
+/* Resident star rating on each service card */
+.rate { display: grid; gap: 2px; border-top: 1px solid var(--border); padding-top: 6px; }
+.rate-stars { display: flex; }
+.rate-stars button { min-width: 44px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--border); font-size: 1.5rem; cursor: pointer; }
+.rate-stars:hover button, .rate-stars button:focus-visible { color: var(--accent); }
+.rate-stars button:hover ~ button { color: var(--border); }
