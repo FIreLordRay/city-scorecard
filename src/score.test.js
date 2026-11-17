@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { pctRank, rateServices, km, centroid, gradeOf, scoreAreas, equity } from './score.js'
+import { pctRank, rateServices, km, centroid, gradeOf, scoreAreas, equity, contains } from './score.js'
 import { rollup } from './data.js'
 
 test('pctRank', () => {
@@ -72,4 +72,15 @@ test('equity: poorer areas waiting twice as long shows up, request mix does not'
   const mixOnly = equity(rows.filter((r) => !['dumping', 'rare'].includes(r.sr_type)), low)
   expect(mixOnly.poor).toBeCloseTo(1)
   expect(mixOnly.rich).toBeCloseTo(1)
+})
+
+test('contains: inside, outside, in a hole, and across a MultiPolygon', () => {
+  const sq = (a, b) => [[a, a], [b, a], [b, b], [a, b], [a, a]]
+  const donut = { type: 'Polygon', coordinates: [sq(0, 10), sq(4, 6)] }
+  expect(contains(donut, [2, 2])).toBe(true)
+  expect(contains(donut, [5, 5])).toBe(false)   // in the hole
+  expect(contains(donut, [11, 5])).toBe(false)
+  const two = { type: 'MultiPolygon', coordinates: [[sq(0, 1)], [sq(5, 6)]] }
+  expect(contains(two, [5.5, 5.5])).toBe(true)
+  expect(contains(two, [3, 3])).toBe(false)
 })

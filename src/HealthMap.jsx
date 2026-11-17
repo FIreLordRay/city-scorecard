@@ -24,10 +24,10 @@ export const buildPlaces = (centers, clinics) => [
   })),
 ]
 
-// The closest few places to a neighborhood's center.
-// shortcut: straight-line distance from the area's center, not travel time; directions give the real route.
-export function nearestPlaces(area, places, count = 5) {
-  const c = centroid(area.feature.geometry)
+// The closest few places to a neighborhood's center, or to `from` ([lat, lng]) when someone gave an address.
+// shortcut: straight-line distance, not travel time; directions give the real route.
+export function nearestPlaces(area, places, count = 5, from = null) {
+  const c = from ?? centroid(area.feature.geometry)
   const seen = new Set() // HRSA lists some clinics once per suite; show each clinic once
   return places.map((p) => ({ ...p, d: km(c, [p.lat, p.lng]) })).sort((a, b) => a.d - b.d)
     .filter((p) => !seen.has(p.name) && seen.add(p.name)).slice(0, count)

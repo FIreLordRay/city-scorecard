@@ -107,3 +107,15 @@ export function equity(byAreaType, lowById) {
     .sort((a, b) => b.poor / b.rich - a.poor / a.rich)
   return { areas, rich: avg(rich.map((a) => a.index)), poor: avg(poor.map((a) => a.index)), services }
 }
+// Is [lng, lat] inside this GeoJSON Polygon or MultiPolygon? Even-odd ray cast over every ring, so holes count as outside.
+export function contains(geometry, [x, y]) {
+  const polys = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  let inside = false
+  for (const ring of polys.flat()) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j]
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
+    }
+  }
+  return inside
+}

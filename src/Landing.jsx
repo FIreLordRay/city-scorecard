@@ -1,5 +1,6 @@
 import { ArrowRight, ClipboardList, Star, LayoutGrid, MapPin, Scale } from 'lucide-react'
 import NeighborhoodSearch from './NeighborhoodSearch.jsx'
+import AddressSearch from './AddressSearch.jsx'
 
 // The front door. It shows no numbers: everything here is a way to ask for the data you want.
 const DOORS = [
@@ -10,7 +11,7 @@ const DOORS = [
   [Star, 'Rate the city services', 'Best to worst.', '#service-ratings'],
 ]
 
-export default function Landing({ areas }) {
+export default function Landing({ areas, onFound }) {
   return (
     <>
       <section className="landing-hero">
@@ -21,6 +22,7 @@ export default function Landing({ areas }) {
             ? <NeighborhoodSearch areas={areas} large />
             : <input type="search" disabled aria-label="Find a neighborhood" placeholder="Loading neighborhoods…" />}
         </div>
+        {areas && <AddressSearch areas={areas} onFound={onFound} />}
       </section>
       <h2 className="visually-hidden">Or start with a question</h2>
       <ul className="doors">

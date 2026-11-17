@@ -267,3 +267,28 @@ a { color: var(--accent); }
 .gaps li { display: grid; gap: 6px; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
 @media (max-width: 640px) { .pair { grid-template-columns: 5em 1fr 4.6em; gap: 8px; } .gaps { grid-template-columns: 1fr; } }
 .pair > :last-child { white-space: nowrap; }
+/* Address lookup on the landing page, plus ward, wait meter and share on the neighborhood report. */
+.lookup { display: grid; gap: 8px; max-width: 640px; margin-top: 16px; }
+.lookup > label { font-weight: 700; }
+.lookup-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.lookup-row input { flex: 1 1 260px; min-height: 44px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font: inherit; }
+.lookup-row button, .share { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 8px; background: var(--accent);
+  color: var(--bg); font: inherit; font-weight: 700; cursor: pointer; }
+.lookup-row button:disabled { opacity: 0.7; cursor: progress; }
+.share { margin-top: 8px; }
+.small-note { font-size: 0.85rem; }
+.note { margin: 4px 0 0; color: var(--accent); }
+.wait { margin: 20px 0; padding: 16px 18px; border-radius: 12px; border: 1px solid var(--accent-dark); background: var(--accent-soft); }
+.wait-stat { font-size: 1.15rem; margin: 0 0 12px; }
+.wait-stat strong { color: var(--accent); }
+/* Gold half = faster than average, rose half = slower; the ring marks this neighborhood. */
+.wait-meter { position: relative; height: 12px; border-radius: 6px; margin: 8px 6px 4px;
+  background: linear-gradient(90deg, var(--accent), #8f8a4e 50%, var(--accent-dark)); }
+.wait-meter .avg { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 2px; background: var(--text); opacity: 0.6; }
+.wait-meter .mark { position: absolute; top: 50%; width: 22px; height: 22px; border-radius: 50%; transform: translate(-50%, -50%);
+  border: 3px solid var(--text); background: var(--bg); }
+.wait-scale { display: flex; justify-content: space-between; margin: 0 0 8px; font-size: 0.8rem; color: var(--muted); }
+.ward { display: flex; flex-direction: column; gap: 2px; margin: 0 0 8px; }
+.links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.links a { display: inline-flex; align-items: center; min-height: 44px; }
