@@ -299,3 +299,11 @@ a { color: var(--accent); }
 .rate-stars button { min-width: 44px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--border); font-size: 1.5rem; cursor: pointer; }
 .rate-stars:hover button, .rate-stars button:focus-visible { color: var(--accent); }
 .rate-stars button:hover ~ button { color: var(--border); }
+
+/* Safety, transit, housing and food on the neighborhood report */
+.more-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.more-grid article { padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+.more-grid h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 1rem; }
+.more-grid p { margin: 4px 0; }
+.more-grid .big { font-size: 1.6rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.line { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 4px; color: #fff; font-size: 0.75rem; font-weight: 700; }
