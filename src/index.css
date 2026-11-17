@@ -264,7 +264,7 @@ a { color: var(--accent); }
 .pair.poor .bar2 span { background: #e6a99a; }
 .pair.poor > :last-child { color: #e6a99a; font-weight: 700; }
 .gaps { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
-.gaps li { display: grid; gap: 6px; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+.gaps li { display: grid; align-content: start; gap: 6px; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
 @media (max-width: 640px) { .pair { grid-template-columns: 5em 1fr 4.6em; gap: 8px; } .gaps { grid-template-columns: 1fr; } }
 .pair > :last-child { white-space: nowrap; }
 /* Ward, wait meter and share on the neighborhood report. */

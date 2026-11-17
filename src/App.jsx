@@ -362,7 +362,6 @@ function Fairness({ data, areas, e }) {
   const asOf = new Date(data.savedAt ?? Date.now()).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
   const per10 = 10 * (e.poor / e.rich)
   const shown = all ? e.services : e.services.slice(0, 5)
-  const maxDays = Math.max(...shown.map((x) => Math.max(x.poor, x.rich)))
   const byWait = [...e.areas].sort((a, b) => b.index - a.index)
   const mine = pick && e.areas.find((a) => a.id === pick)
   const rank = mine && byWait.findIndex((a) => a.id === pick) + 1
@@ -382,15 +381,22 @@ function Fairness({ data, areas, e }) {
         <div className="pair poor"><span>{k} poorest</span><span className="bar2"><span style={{ width: `${(per10 / Math.max(10, per10)) * 100}%` }} /></span><b>{fmt(per10, 1)} days</b></div>
       </div>
 
-      <h2>Where the gap is biggest</h2>
+      <h2>{all ? 'Every service, biggest gap first' : 'Where the gap is biggest'}</h2>
       <ul className="gaps">
-        {shown.map((x) => (
-          <li key={x.type}>
-            <b>{x.type}</b>
-            <div className="pair"><span>Richest</span><span className="bar2"><span style={{ width: `${(x.rich / maxDays) * 100}%` }} /></span><span>{dayWord(x.rich)}</span></div>
-            <div className="pair poor"><span>Poorest</span><span className="bar2"><span style={{ width: `${(x.poor / maxDays) * 100}%` }} /></span><span>{dayWord(x.poor)}</span></div>
-          </li>
-        ))}
+        {shown.map((x) => {
+          // Each card compares its own two waits; one shared scale let a 48-day service squash every other bar.
+          const top = Math.max(x.rich, x.poor)
+          const worse = x.poor > x.rich * 1.05 // within 5% reads as the same wait
+          const better = x.poor < x.rich * 0.95
+          return (
+            <li key={x.type}>
+              <b>{x.type}</b>
+              <div className="pair"><span>Richest</span><span className="bar2"><span style={{ width: `${(x.rich / top) * 100}%` }} /></span><span>{dayWord(x.rich)}</span></div>
+              <div className={worse ? 'pair poor' : 'pair'}><span>Poorest</span><span className="bar2"><span style={{ width: `${(x.poor / top) * 100}%` }} /></span><span>{dayWord(x.poor)}</span></div>
+              {!worse && <span className="muted small-note">{better ? 'The poorest areas wait less for this one.' : 'About the same wait in both.'}</span>}
+            </li>
+          )
+        })}
       </ul>
       {e.services.length > 5 && (
         <button className="btn more" onClick={() => setAll((v) => !v)}>{all ? 'Show top 5' : `Show all ${e.services.length}`}</button>
